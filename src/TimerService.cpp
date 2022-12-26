@@ -16,7 +16,7 @@
 #include "thread/TickTimeout.h"
 #include "TimerService.h"
 
-using namespace Microservice;
+using namespace Config;
 
 TimerService::Task::Task(const String &path) : _path(path) {
 }

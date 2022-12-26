@@ -13,7 +13,7 @@
 #include "data/Variant.h"
 #include "thread/Timer.h"
 
-using namespace Common;
+using namespace Data;
 
 class SimulatorService : public IDataProvider {
 public:

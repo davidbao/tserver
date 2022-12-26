@@ -12,7 +12,7 @@
 #include "thread/TickTimeout.h"
 #include "system/Random.h"
 
-using namespace Microservice;
+using namespace Config;
 
 SimulatorService::Tag::Tag(const String &registerStr) : registerStr(registerStr), value(Variant::Float64) {
 }

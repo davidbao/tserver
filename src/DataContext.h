@@ -13,7 +13,7 @@
 #include "database/DataTable.h"
 #include "database/SqlSelectFilter.h"
 
-using namespace Common;
+using namespace Data;
 using namespace Database;
 
 enum FetchResult {

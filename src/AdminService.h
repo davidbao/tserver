@@ -24,7 +24,19 @@ public:
     bool unInitialize();
 
 private:
-    HttpStatus onHome(const HttpRequest& request, HttpResponse& response);
+    HttpStatus onModifyDatabase(const HttpRequest &request, HttpResponse &response);
+
+    HttpStatus onAddTimingTask(const HttpRequest &request, HttpResponse &response);
+
+    HttpStatus onRemoveTimingTask(const HttpRequest &request, HttpResponse &response);
+
+    HttpStatus onAddLabel(const HttpRequest &request, HttpResponse &response);
+
+    HttpStatus onRemoveLabel(const HttpRequest &request, HttpResponse &response);
+
+    HttpStatus onAddTable(const HttpRequest &request, HttpResponse &response);
+
+    HttpStatus onRemoveTable(const HttpRequest &request, HttpResponse &response);
 };
 
 

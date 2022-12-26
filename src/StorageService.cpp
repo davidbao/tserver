@@ -16,6 +16,7 @@
 #include "system/ServiceFactory.h"
 #include "configuration/ConfigService.h"
 
+using namespace Config;
 using namespace Microservice;
 
 StorageService::StorageService() {

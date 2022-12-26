@@ -11,7 +11,7 @@
 #include "SimulatorService.h"
 #include "StorageService.h"
 
-using namespace Microservice;
+using namespace Config;
 
 DataService::DataService() : _provider(nullptr) {
     ServiceFactory *factory = ServiceFactory::instance();

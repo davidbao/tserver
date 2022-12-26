@@ -12,7 +12,7 @@
 #include "system/ServiceFactory.h"
 #include "DataContext.h"
 
-using namespace Common;
+using namespace System;
 
 class DataService : public IService {
 public:

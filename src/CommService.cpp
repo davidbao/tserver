@@ -14,7 +14,7 @@
 #include "microservice/HttpService.h"
 #include "DataService.h"
 
-using namespace Common;
+using namespace Data;
 using namespace Microservice;
 
 CommService::CommService() = default;
@@ -37,13 +37,13 @@ bool CommService::initialize() {
     const String appPath = Directory::getAppPath();
     bundlePath = Path::combine(appPath, admin_bundle_str);
     if (Directory::exists(bundlePath)) {
-        hs->registerWebServer(bundlePath);
+        hs->registerWebPath(bundlePath);
     } else {
         Application *app = Application::instance();
         assert(app);
         bundlePath = Path::combine(app->rootPath(), admin_bundle_str);
         if (Directory::exists(bundlePath)) {
-            hs->registerWebServer(bundlePath);
+            hs->registerWebPath(bundlePath);
         }
     }
 
