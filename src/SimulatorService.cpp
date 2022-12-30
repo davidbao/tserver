@@ -14,7 +14,7 @@
 
 using namespace Config;
 
-SimulatorService::Tag::Tag(const String &registerStr) : registerStr(registerStr), value(Variant::Float64) {
+SimulatorService::Tag::Tag(const String &registerStr) : registerStr(registerStr), value(Variant::Null) {
 }
 
 SimulatorService::Tag::Tag(const Tag &tag) {
@@ -35,6 +35,9 @@ void SimulatorService::Tag::evaluates(const Tag &other) {
 
 void SimulatorService::Tag::runOnce(const Label *label) {
     if (String::equals(registerStr, "increase", true)) {
+        if (value.isNullType()) {
+            value = Variant(Variant::Float64);
+        }
         if (value.isNullValue()) {
             value = label->minValue;
         } else {
@@ -46,6 +49,9 @@ void SimulatorService::Tag::runOnce(const Label *label) {
             value = v;
         }
     } else if (String::equals(registerStr, "decrease", true)) {
+        if (value.isNullType()) {
+            value = Variant(Variant::Float64);
+        }
         if (value.isNullValue()) {
             value = label->maxValue;
         } else {
@@ -57,11 +63,27 @@ void SimulatorService::Tag::runOnce(const Label *label) {
             value = v;
         }
     } else if (String::equals(registerStr, "random", true)) {
+        if (value.isNullType()) {
+            value = Variant(Variant::Float64);
+        }
         value = Random::getRandValue(label->minValue, label->maxValue);
+    } else if (String::equals(registerStr, "uuid", true)) {
+        if (value.isNullType()) {
+            value = Variant(Variant::Text);
+        }
+        value = Uuid::generate().toString();
     } else {
         double v;
         if (Double::parse(registerStr, v)) {
+            if (value.isNullType()) {
+                value = Variant(Variant::Float64);
+            }
             value = v;
+        } else {
+            if (value.isNullType()) {
+                value = Variant(Variant::Text);
+            }
+            value = registerStr;
         }
     }
 }
@@ -105,11 +127,12 @@ bool SimulatorService::Label::isTimeUp() {
 SimulatorService::Column::Column() {
 }
 
-SimulatorService::Column::Column(const String &name, const String &registerStr) {
+SimulatorService::Column::Column(const String &name, const String &registerStr, const String &style) {
     this->name = name;
     this->registerStr = registerStr;
+    this->style = style;
     if (String::equals(registerStr, "time", true)) {
-        this->value = Variant(ValueTypes::Date);
+        this->value = Variant(ValueTypes::Text);
     } else if (String::equals(registerStr, "increase", true) ||
                String::equals(registerStr, "decrease", true) ||
                String::equals(registerStr, "random", true)) {
@@ -131,12 +154,14 @@ SimulatorService::Column::Column(const Column &Column) {
 bool SimulatorService::Column::equals(const Column &other) const {
     return this->name == other.name &&
            this->registerStr == other.registerStr &&
+           this->style == other.style &&
            this->value == other.value;
 }
 
 void SimulatorService::Column::evaluates(const Column &other) {
     this->name = other.name;
     this->registerStr = other.registerStr;
+    this->style = other.style;
     this->value = other.value;
 }
 
@@ -154,15 +179,74 @@ String SimulatorService::Column::getValue(const Table *table, const SqlSelectFil
         double v = Random::getRandValue(table->minValue, table->maxValue);
         result = Double(v).toString();
     } else if (String::equals(registerStr, "time", true)) {
-        DateTime timeFrom;
-        DateTime::parse(filter.getValue(String::format("%s.from", name.c_str())), timeFrom);
-        DateTime timeTo;
-        DateTime::parse(filter.getValue(String::format("%s.to", name.c_str())), timeTo);
-        if (timeTo > timeFrom) {
-            TimeSpan interval = TimeSpan::fromTicks((timeTo.ticks() - timeFrom.ticks()) / table->rowCount);
-            DateTime v = timeFrom.addTicks(interval.ticks() * row);
-            result = v.toString();
+        if (!style.isNullOrEmpty()) {
+            DateTime minValue, maxValue;
+            TimeSpan step;
+            String format;
+            StringArray texts;
+            StringArray::parse(style, texts, ';');
+            for (size_t i = 0; i < texts.count(); ++i) {
+                char nameStr[255] = {0}, valueStr[255] = {0};
+                int rValue = sscanf(texts[i].trim().c_str(), "%[a-z|A-Z|0-9]:%s", nameStr, valueStr);
+                if (rValue >= 2) {
+                    String name = String::trim(nameStr, '\'', '"', ' ');
+                    String value = String::trim(valueStr, '\'', '"', ' ');
+                    if (String::equals(name, "range", true)) {
+                        if (String::equals(value, "today", true)) {
+                            DateTime now = DateTime::now();
+                            minValue = now.date();
+                            maxValue = now.date().addDays(1);
+//                            printf("today minValue: %s, maxValue: %s\n", minValue.toString().c_str(), maxValue.toString().c_str());
+                        } else if (String::equals(value, "yesterday", true)) {
+                            DateTime now = DateTime::now();
+                            minValue = now.date().addDays(-1);
+                            maxValue = now.date();
+//                            printf("yesterday minValue: %s, maxValue: %s\n", minValue.toString().c_str(), maxValue.toString().c_str());
+                        } else if (String::equals(value, "thismonth", true)) {
+                            DateTime now = DateTime::now();
+                            minValue = DateTime(now.year(), now.month(), 1);
+                            maxValue = minValue.addMonths(1);
+//                            printf("yesterday minValue: %s, maxValue: %s\n", minValue.toString().c_str(), maxValue.toString().c_str());
+                        } else {
+                            StringArray ranges;
+                            StringArray::parse(value, ranges, ';');
+                            if (ranges.count() == 2) {
+                                DateTime::parse(ranges[0], minValue);
+                                DateTime::parse(ranges[2], maxValue);
+                            }
+                        }
+                    } else if (String::equals(name, "step", true)) {
+                        TimeSpan::parse(value, step);
+//                        printf("value: %s, step: %s\n", value.c_str(), step.toString().c_str());
+                    } else if (String::equals(name, "format", true)) {
+                        format = value;
+                    }
+                }
+            }
+            if (!(minValue == DateTime::MinValue && maxValue == DateTime::MaxValue &&
+                  step == TimeSpan::Zero && !format.isNullOrEmpty())) {
+                DateTime v = minValue.addTicks(step.ticks() * row);
+                result = v.toString(format);
+            }
+        }/* else {
+            DateTime timeFrom;
+            DateTime::parse(filter.getValue(String::format("%s.from", name.c_str())), timeFrom);
+            DateTime timeTo;
+            DateTime::parse(filter.getValue(String::format("%s.to", name.c_str())), timeTo);
+            if (timeTo > timeFrom) {
+                TimeSpan interval = TimeSpan::fromTicks((timeTo.ticks() - timeFrom.ticks()) / table->rowCount);
+                DateTime v = timeFrom.addTicks(interval.ticks() * row);
+                result = v.toString();
+            }
+        }*/
+    } else if (String::equals(registerStr, "array", true)) {
+        StringArray texts;
+        StringArray::parse(style, texts, ';');
+        if (row < texts.count()) {
+            result = String::trim(texts[row], '\'', '"', ' ');
         }
+    } else if (String::equals(registerStr, "uuid", true)) {
+        result = Uuid::generate().toString();
     } else {
         result = registerStr;
     }
@@ -345,12 +429,13 @@ void SimulatorService::initTables() {
 #define maxColumnCount 100
 #define columnPrefix tablePrefix "columns[%d]."
         for (int j = 0; j < maxColumnCount; j++) {
-            String name, registerStr;
+            String name, registerStr, style;
             if (!cs->getProperty(String::format(columnPrefix "name", i, j), name)) {
                 break;
             }
             cs->getProperty(String::format(columnPrefix "register", i, j), registerStr);
-            Column column(name, registerStr);
+            cs->getProperty(String::format(columnPrefix "style", i, j), style);
+            Column column(name, registerStr, style);
             table.columns.add(column);
         }
         _tables.add(table);

@@ -69,11 +69,12 @@ public:
     public:
         String name;
         String registerStr;
+        String style;
         Variant value;
 
         Column();
 
-        Column(const String &name, const String &registerStr);
+        Column(const String &name, const String &registerStr, const String &style);
 
         Column(const Column &Column);
 

@@ -111,13 +111,14 @@ FetchResult DataService::getTableValues(const JsonNode &request, JsonNode &respo
                     iNode.add(JsonNode("name", name));
                     iNode.add(JsonNode("errorCode", (int) result));
                     if (result == FetchResult::Succeed) {
-                        iNode.add(JsonNode("dataTotal", ((Int32) table.totalCount()).toString()));
-                        iNode.add(JsonNode("maxPageNum",
-                                           filter.pageSize() > 0 ? ((Int32) (table.totalCount() / filter.pageSize() +
-                                                                             1)).toString() : "0"));
-                        iNode.add(JsonNode("pageCount", ((Int32) filter.pageSize()).toString()));
-                        iNode.add(JsonNode("pageNum", ((Int32) filter.page()).toString()));
-                        iNode.add(JsonNode("pageStart", ((Int32) (filter.offset())).toString()));
+                        iNode.add(JsonNode("page", filter.page()));
+                        iNode.add(JsonNode("pageSize", filter.pageSize()));
+//                        iNode.add(JsonNode("pageOffset", Int32(filter.offset()).toString()));
+                        int pageCount = filter.pageSize() > 0 ?
+                                        (table.totalCount() / filter.pageSize() + (
+                                                table.totalCount() % filter.pageSize() == 0 ? 0 : 1)) : 0;
+                        iNode.add(JsonNode("pageCount", pageCount));
+                        iNode.add(JsonNode("totalCount", table.totalCount()));
 
                         JsonNode dataNode;
                         table.toJsonNode(dataNode, "g");
@@ -125,10 +126,10 @@ FetchResult DataService::getTableValues(const JsonNode &request, JsonNode &respo
                     }
                     tNode.add(iNode);
                 }
-                response = tNode;
-
-                return FetchResult::Succeed;
             }
+            response = tNode;
+
+            return FetchResult::Succeed;
         }
     }
 
