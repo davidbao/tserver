@@ -49,7 +49,7 @@ FetchResult StorageService::getLabelValues(const String &labelName, const String
 
     String sql;
     sql = getSql(labelName, 0);
-    if(sql.isNullOrEmpty()) {
+    if (sql.isNullOrEmpty()) {
         sql = String::format("SELECT %s FROM %s limit 1", tagNames.toString(',').c_str(), labelName.c_str());
     }
 
@@ -88,7 +88,7 @@ FetchResult StorageService::getTableValues(const String &tableName, const SqlSel
 
     String sql;
     sql = getSql(tableName, 1);
-    if(sql.isNullOrEmpty()) {
+    if (sql.isNullOrEmpty()) {
         sql = filter.toQuerySql(tableName);
     }
 
@@ -98,7 +98,7 @@ FetchResult StorageService::getTableValues(const String &tableName, const SqlSel
 
     if (dbClient->executeSqlQuery(sql, table)) {
         sql = getSql(tableName, 2);
-        if(sql.isNullOrEmpty()) {
+        if (sql.isNullOrEmpty()) {
             sql = filter.toCountSql(tableName);
         }
 
@@ -123,7 +123,7 @@ String StorageService::getSqlFileName(const String &name, int sqlIndex) {
     cs->getProperty("summer.exchange.database.path", subPath);
 
     String sqlFileName;
-    if( sqlIndex == 0) {
+    if (sqlIndex == 0) {
 #define maxLabelCount 1000
 #define labelPrefix "summer.exchange.database.labels[%d]."
         for (int i = 0; i < maxLabelCount; i++) {
@@ -131,8 +131,8 @@ String StorageService::getSqlFileName(const String &name, int sqlIndex) {
             if (!cs->getProperty(String::format(labelPrefix "name", i), n)) {
                 break;
             }
-            if(name == n) {
-                if(cs->getProperty(String::format(labelPrefix "sql", i), sqlFileName)) {
+            if (name == n) {
+                if (cs->getProperty(String::format(labelPrefix "sql", i), sqlFileName)) {
                     break;
                 }
             }
@@ -145,9 +145,9 @@ String StorageService::getSqlFileName(const String &name, int sqlIndex) {
             if (!cs->getProperty(String::format(tablePrefix "name", i), n)) {
                 break;
             }
-            if(name == n) {
-                const char* fmt = sqlIndex == 1 ? (tablePrefix "querySql") : (tablePrefix "countSql");
-                if(cs->getProperty(String::format(fmt, i), sqlFileName)) {
+            if (name == n) {
+                const char *fmt = sqlIndex == 1 ? (tablePrefix "querySql") : (tablePrefix "countSql");
+                if (cs->getProperty(String::format(fmt, i), sqlFileName)) {
                     break;
                 }
             }
@@ -171,7 +171,7 @@ String StorageService::getSqlFileName(const String &name, int sqlIndex) {
 
 String StorageService::getSql(const String &name, int sqlIndex) {
     String fileName = getSqlFileName(name, sqlIndex);
-    if(File::exists(fileName)) {
+    if (File::exists(fileName)) {
         FileStream fs(fileName, FileMode::FileOpenWithoutException, FileAccess::FileRead);
         String sql;
         fs.readToEnd(sql);

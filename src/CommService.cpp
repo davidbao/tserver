@@ -32,7 +32,7 @@ bool CommService::initialize() {
                         HttpCallback<CommService>(this, &CommService::onExchange));
 
     // register web server.
-    static const char *admin_bundle_str = "www";
+    static const char *admin_bundle_str = "www.bundle";
     String bundlePath;
     const String appPath = Directory::getAppPath();
     bundlePath = Path::combine(appPath, admin_bundle_str);
