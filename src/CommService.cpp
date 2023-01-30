@@ -34,7 +34,7 @@ bool CommService::initialize() {
     // register web server.
     static const char *admin_bundle_str = "www.bundle";
     String bundlePath;
-    const String appPath = Directory::getAppPath();
+    const String appPath = Path::getAppPath();
     bundlePath = Path::combine(appPath, admin_bundle_str);
     if (Directory::exists(bundlePath)) {
         hs->registerWebPath(bundlePath);

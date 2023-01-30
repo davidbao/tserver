@@ -19,16 +19,14 @@
 using namespace Config;
 using namespace Microservice;
 
-StorageService::StorageService() {
-}
+StorageService::StorageService() = default;
 
-StorageService::~StorageService() {
-}
+StorageService::~StorageService() = default;
 
 DbClient *StorageService::dbClient() const {
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
-    IDataSourceService *ds = factory->getService<IDataSourceService>();
+    auto *ds = factory->getService<IDataSourceService>();
     assert(ds);
     DbClient *dbClient = ds->dbClient();
     return dbClient;
@@ -37,7 +35,7 @@ DbClient *StorageService::dbClient() const {
 void StorageService::createSqlFile(const String &fileName, const String &sql) {
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
-    IDataSourceService *ds = factory->getService<IDataSourceService>();
+    auto *ds = factory->getService<IDataSourceService>();
     assert(ds);
     return ds->createSqlFile(fileName, sql);
 }
@@ -69,7 +67,7 @@ FetchResult StorageService::getLabelValues(const String &labelName, const String
         for (size_t i = 0; i < cells.count(); i++) {
             const DataCell &cell = cells.at(i);
             for (size_t j = 0; j < tagNames.count(); j++) {
-                String key = tagNames[j];
+                const String &key = tagNames[j];
                 if (cell.matchColumnName(key)) {
                     String value = cell.value().valueStr();
                     values.add(key, value);
@@ -116,7 +114,7 @@ FetchResult StorageService::getTableValues(const String &tableName, const SqlSel
 String StorageService::getSqlFileName(const String &name, int sqlIndex) {
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
-    IConfigService *cs = factory->getService<IConfigService>();
+    auto *cs = factory->getService<IConfigService>();
     assert(cs);
 
     String subPath;
@@ -154,7 +152,7 @@ String StorageService::getSqlFileName(const String &name, int sqlIndex) {
         }
     }
 
-    const String appPath = Directory::getAppPath();
+    const String appPath = Path::getAppPath();
     String fileName = Path::combine(Path::combine(appPath, subPath), sqlFileName);
     if (File::exists(fileName)) {
         return fileName;

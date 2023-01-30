@@ -10,13 +10,13 @@
 #include "AdminService.h"
 #include "CommService.h"
 #include "DataService.h"
-#include "TimerService.h"
+#include "TaskService.h"
 
 AppStarter::AppStarter() {
     _adminService = new AdminService();
     _commService = new CommService();
     _dataService = new DataService();
-    _timerService = new TimerService();
+    _timerService = new TaskService();
 }
 
 AppStarter::~AppStarter() {

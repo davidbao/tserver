@@ -12,7 +12,7 @@
 class AdminService;
 class CommService;
 class DataService;
-class TimerService;
+class TaskService;
 
 class AppStarter {
 public:
@@ -28,7 +28,7 @@ private:
     AdminService* _adminService;
     CommService* _commService;
     DataService* _dataService;
-    TimerService* _timerService;
+    TaskService* _timerService;
 };
 
 #endif //TSERVER_APPSTARTER_H

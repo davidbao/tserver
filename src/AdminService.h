@@ -26,17 +26,38 @@ public:
 private:
     HttpStatus onModifyDatabase(const HttpRequest &request, HttpResponse &response);
 
-    HttpStatus onAddTimingTask(const HttpRequest &request, HttpResponse &response);
+    // task
+    bool onGetTask(const HttpRequest &request, const SqlSelectFilter &filter, DataTable &table);
 
-    HttpStatus onRemoveTimingTask(const HttpRequest &request, HttpResponse &response);
+    HttpStatus onAddTask(const HttpRequest &request, HttpResponse &response);
+
+    HttpStatus onAddTaskApp(const HttpRequest &request, HttpResponse &response);
+
+    HttpStatus onRemoveTask(const HttpRequest &request, HttpResponse &response);
+
+    HttpStatus onUpdateTask(const HttpRequest &request, HttpResponse &response);
+
+    // label
+    bool onGetLabel(const HttpRequest &request, const SqlSelectFilter &filter, DataTable &table);
 
     HttpStatus onAddLabel(const HttpRequest &request, HttpResponse &response);
 
     HttpStatus onRemoveLabel(const HttpRequest &request, HttpResponse &response);
 
+    HttpStatus onUpdateLabel(const HttpRequest &request, HttpResponse &response);
+
+    // table
+    bool onGetTable(const HttpRequest &request, const SqlSelectFilter &filter, DataTable &table);
+
     HttpStatus onAddTable(const HttpRequest &request, HttpResponse &response);
 
     HttpStatus onRemoveTable(const HttpRequest &request, HttpResponse &response);
+
+    HttpStatus onUpdateTable(const HttpRequest &request, HttpResponse &response);
+
+    typedef bool (*Method)(const StringMap &, StringMap &);
+
+    HttpStatus onAction(const HttpRequest &request, HttpResponse &response, Method method);
 };
 
 
