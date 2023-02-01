@@ -74,9 +74,9 @@ bool AdminService::initialize() {
         }
     }
 
-    auto *cs = factory->getService<IConfigService>();
-    assert(cs);
-    cs->printProperties();
+//    auto *cs = factory->getService<IConfigService>();
+//    assert(cs);
+//    cs->printProperties();
 
     return true;
 }
