@@ -10,9 +10,12 @@
 #include "IO/Directory.h"
 #include "system/ServiceFactory.h"
 #include "system/Application.h"
+#include "crypto/Md5Provider.h"
 #include "configuration/ConfigService.h"
 #include "TaskService.h"
 #include "SimulatorService.h"
+
+using namespace Crypto;
 
 AdminService::AdminService() = default;
 
@@ -24,37 +27,52 @@ bool AdminService::initialize() {
     auto *hs = factory->getService<IHttpRegister>();
     assert(hs);
 
-#define BasePath "v1/api/admin"
+#define BasePath "tserver/v1"
+    // database
     hs->registerMapping(HttpMethod::Post, BasePath "/modifyDatabase",
                         HttpCallback<AdminService>(this, &AdminService::onModifyDatabase));
 
-    hs->registerQuery(HttpMethod::Post, BasePath "/getTask",
-                      HttpQueryCallback<AdminService>(this, &AdminService::onGetTask));
-    hs->registerMapping(HttpMethod::Post, BasePath "/addTask",
+    // web
+    hs->registerMapping(HttpMethod::Put, BasePath "/web/bundle",
+                        HttpCallback<AdminService>(this, &AdminService::onUploadWebBundle));
+
+    // task
+    hs->registerQuery(HttpMethod::Get, BasePath "/task/list",
+                      HttpQueryCallback<AdminService>(this, &AdminService::onGetTaskList));
+    hs->registerMapping(HttpMethod::Get, BasePath "/task",
+            HttpCallback<AdminService>(this, &AdminService::onGetTask));
+    hs->registerMapping(HttpMethod::Put, BasePath "/task",
                         HttpCallback<AdminService>(this, &AdminService::onAddTask));
-    hs->registerMapping(HttpMethod::Put, BasePath "/addTaskApp",
+    hs->registerMapping(HttpMethod::Put, BasePath "/task/app",
                         HttpCallback<AdminService>(this, &AdminService::onAddTaskApp));
-    hs->registerMapping(HttpMethod::Post, BasePath "/removeTask",
+    hs->registerMapping(HttpMethod::Delete, BasePath "/task",
                         HttpCallback<AdminService>(this, &AdminService::onRemoveTask));
-    hs->registerMapping(HttpMethod::Post, BasePath "/updateTask",
+    hs->registerMapping(HttpMethod::Post, BasePath "/task",
                         HttpCallback<AdminService>(this, &AdminService::onUpdateTask));
 
-    hs->registerQuery(HttpMethod::Post, BasePath "/getLabel",
-                      HttpQueryCallback<AdminService>(this, &AdminService::onGetLabel));
-    hs->registerMapping(HttpMethod::Post, BasePath "/addLabel",
+#define SimulatorPath BasePath "/simulator"
+    // label
+    hs->registerQuery(HttpMethod::Get, SimulatorPath "/label/list",
+                      HttpQueryCallback<AdminService>(this, &AdminService::onGetLabelList));
+    hs->registerMapping(HttpMethod::Get, SimulatorPath "/label",
+                        HttpCallback<AdminService>(this, &AdminService::onGetLabel));
+    hs->registerMapping(HttpMethod::Put, SimulatorPath "/label",
                         HttpCallback<AdminService>(this, &AdminService::onAddLabel));
-    hs->registerMapping(HttpMethod::Post, BasePath "/removeLabel",
+    hs->registerMapping(HttpMethod::Delete, SimulatorPath "/label",
                         HttpCallback<AdminService>(this, &AdminService::onRemoveLabel));
-    hs->registerMapping(HttpMethod::Post, BasePath "/updateLabel",
+    hs->registerMapping(HttpMethod::Post, SimulatorPath "/label",
                         HttpCallback<AdminService>(this, &AdminService::onUpdateLabel));
 
-    hs->registerQuery(HttpMethod::Post, BasePath "/getTable",
-                        HttpQueryCallback<AdminService>(this, &AdminService::onGetTable));
-    hs->registerMapping(HttpMethod::Post, BasePath "/addTable",
+    // table
+    hs->registerQuery(HttpMethod::Get, SimulatorPath "/table/list",
+                        HttpQueryCallback<AdminService>(this, &AdminService::onGetTableList));
+    hs->registerMapping(HttpMethod::Get, SimulatorPath "/table",
+                        HttpCallback<AdminService>(this, &AdminService::onGetTable));
+    hs->registerMapping(HttpMethod::Put, SimulatorPath "/table",
                         HttpCallback<AdminService>(this, &AdminService::onAddTable));
-    hs->registerMapping(HttpMethod::Post, BasePath "/removeTable",
+    hs->registerMapping(HttpMethod::Delete, SimulatorPath "/table",
                         HttpCallback<AdminService>(this, &AdminService::onRemoveTable));
-    hs->registerMapping(HttpMethod::Post, BasePath "/updateTable",
+    hs->registerMapping(HttpMethod::Post, SimulatorPath "/table",
                         HttpCallback<AdminService>(this, &AdminService::onUpdateTable));
 
     // register web server.
@@ -112,13 +130,44 @@ HttpStatus AdminService::onModifyDatabase(const HttpRequest &request, HttpRespon
     return HttpStatus::HttpOk;
 }
 
-bool AdminService::onGetTask(const HttpRequest &request, const SqlSelectFilter &filter, DataTable &table) {
+HttpStatus AdminService::onUploadWebBundle(const HttpRequest &request, HttpResponse &response) {
+    JsonNode result;
+    StringMap tRequest, tResponse;
+    tRequest.add("md5", request.getPropValue("md5"));
+    auto *sc = dynamic_cast<HttpStreamContent *>(request.content);
+    auto *fs = dynamic_cast<FileStream *>(sc != nullptr ? sc->stream() : nullptr);
+    String fullFileName = fs != nullptr ? fs->fileName() : String::Empty;
+    tRequest.add("fullFileName", fullFileName);
+
+    uploadWebBundle(tRequest, tResponse);
+    int code = HttpCode::Unknown;   // unknown code.
+    Int32::parse(tResponse["code"], code);
+    result.add(JsonNode("code", code));
+    result.add(JsonNode("msg", tResponse["msg"]));
+
+    response.setContent(result);
+    return HttpStatus::HttpOk;
+}
+
+bool AdminService::onGetTaskList(const HttpRequest &request, const SqlSelectFilter &filter, DataTable &table) {
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
     auto *ts = factory->getService<TaskService>();
     assert(ts);
 
     return ts->getTasks(filter, table);
+}
+
+HttpStatus AdminService::onGetTask(const HttpRequest &request, HttpResponse &response) {
+    StringMap tRequest, tResponse;
+    auto method = [](const StringMap &tRequest, StringMap &tResponse) {
+        ServiceFactory *factory = ServiceFactory::instance();
+        assert(factory);
+        auto *ts = factory->getService<TaskService>();
+        assert(ts);
+        return ts->getTask(tRequest, tResponse);
+    };
+    return onAction(request, response, method);
 }
 
 HttpStatus AdminService::onAddTask(const HttpRequest &request, HttpResponse &response) {
@@ -149,7 +198,9 @@ HttpStatus AdminService::onAddTaskApp(const HttpRequest &request, HttpResponse &
     assert(ts);
 
     ts->addTaskApp(tRequest, tResponse);
-    result.add(JsonNode("code", tResponse["code"]));
+    int code = HttpCode::Unknown;   // unknown code.
+    Int32::parse(tResponse["code"], code);
+    result.add(JsonNode("code", code));
     result.add(JsonNode("msg", tResponse["msg"]));
 
     response.setContent(result);
@@ -180,13 +231,25 @@ HttpStatus AdminService::onUpdateTask(const HttpRequest &request, HttpResponse &
     return onAction(request, response, method);
 }
 
-bool AdminService::onGetLabel(const HttpRequest &request, const SqlSelectFilter &filter, DataTable &table) {
+bool AdminService::onGetLabelList(const HttpRequest &request, const SqlSelectFilter &filter, DataTable &table) {
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
     auto *ts = factory->getService<SimulatorService>();
     assert(ts);
 
     return ts->getLabels(filter, table);
+}
+
+HttpStatus AdminService::onGetLabel(const HttpRequest &request, HttpResponse &response) {
+    StringMap tRequest, tResponse;
+    auto method = [](const StringMap &tRequest, StringMap &tResponse) {
+        ServiceFactory *factory = ServiceFactory::instance();
+        assert(factory);
+        auto *ts = factory->getService<SimulatorService>();
+        assert(ts);
+        return ts->getLabel(tRequest, tResponse);
+    };
+    return onAction(request, response, method);
 }
 
 HttpStatus AdminService::onAddLabel(const HttpRequest &request, HttpResponse &response) {
@@ -225,13 +288,25 @@ HttpStatus AdminService::onUpdateLabel(const HttpRequest &request, HttpResponse 
     return onAction(request, response, method);
 }
 
-bool AdminService::onGetTable(const HttpRequest &request, const SqlSelectFilter &filter, DataTable &table) {
+bool AdminService::onGetTableList(const HttpRequest &request, const SqlSelectFilter &filter, DataTable &table) {
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
     auto *ts = factory->getService<SimulatorService>();
     assert(ts);
 
     return ts->getTables(filter, table);
+}
+
+HttpStatus AdminService::onGetTable(const HttpRequest &request, HttpResponse &response) {
+    StringMap tRequest, tResponse;
+    auto method = [](const StringMap &tRequest, StringMap &tResponse) {
+        ServiceFactory *factory = ServiceFactory::instance();
+        assert(factory);
+        auto *ts = factory->getService<SimulatorService>();
+        assert(ts);
+        return ts->getTable(tRequest, tResponse);
+    };
+    return onAction(request, response, method);
 }
 
 HttpStatus AdminService::onAddTable(const HttpRequest &request, HttpResponse &response) {
@@ -274,15 +349,23 @@ HttpStatus AdminService::onAction(const HttpRequest &request, HttpResponse &resp
     if (method != nullptr) {
         JsonNode node, result;
         StringMap tRequest, tResponse;
-        if (JsonNode::parse(request.text(), node) && node.getAttribute(tRequest)) {
+        String str = !request.text().isNullOrEmpty() ? request.text() : request.toPropsStr();
+        if (JsonNode::parse(str, node) && node.getAttribute(tRequest)) {
 //            for (auto it = tRequest.begin(); it != tRequest.end(); ++it) {
 //                const String &k = it.key();
 //                const String &v = it.value();
 //                printf("key: %s, value: %s\n", k.c_str(), v.c_str());
 //            }
             method(tRequest, tResponse);
-            result.add(JsonNode("code", tResponse["code"]));
-            result.add(JsonNode("msg", tResponse["msg"]));
+            int code = HttpCode::Unknown;   // unknown code.
+            Int32::parse(tResponse["code"], code);
+            result.add(JsonNode("code", code));
+            if (tResponse.contains("msg")) {
+                result.add(JsonNode("msg", tResponse["msg"]));
+            }
+            if (tResponse.contains("data")) {
+                result.add(JsonNode("data", tResponse["data"]));
+            }
         } else {
             // Json string parse error.
             result.add(JsonNode("code", "511"));
@@ -293,4 +376,64 @@ HttpStatus AdminService::onAction(const HttpRequest &request, HttpResponse &resp
     } else {
         return HttpStatus::HttpMethodNotAllowed;
     }
+}
+
+bool AdminService::uploadWebBundle(const StringMap &request, StringMap &response) {
+    String md5 = request["md5"];
+    String fullFileName = request["fullFileName"];
+
+    // file exist?
+    if (!File::exists(fullFileName)) {
+        response["code"] = Int32(538).toString();
+        response["msg"] = "Can not find the upload file.";
+        return false;
+    }
+
+    // check md5.
+    if (!md5.isNullOrEmpty()) {
+        String actual;
+        if (Md5Provider::computeFileHash(fullFileName, actual)) {
+            if (!String::equals(actual, md5, true)) {
+                response["code"] = Int32(539).toString();
+                response["msg"] = "Failed to verify md5.";
+                return false;
+            }
+        }
+    }
+
+    // extract files.
+    static const char *admin_bundle_str = "www.bundle";
+    String bundlePath;
+    const String appPath = Path::getAppPath();
+    bundlePath = Path::combine(appPath, admin_bundle_str);
+    if (Directory::exists(bundlePath)) {
+    } else {
+        Application *app = Application::instance();
+        assert(app);
+        bundlePath = Path::combine(app->rootPath(), admin_bundle_str);
+        if (!Directory::exists(bundlePath)) {
+            response["code"] = Int32(550).toString();
+            response["msg"] = "Can not find www.bundle path.";
+            return false;
+        }
+    }
+
+    // extract or copy app, check zip first.
+    Zip zip(fullFileName);
+    if (zip.isValid()) {
+        if (!Zip::extract(fullFileName, bundlePath)) {
+            response["code"] = Int32(540).toString();
+            response["msg"] = "Can not extract the zip file.";
+            return false;
+        }
+    } else {
+        // not a zip file.
+        response["code"] = Int32(551).toString();
+        response["msg"] = "The uploaded file is not a zip file.";
+        return false;
+    }
+
+    response["code"] = "0";
+    response["msg"] = String::Empty;
+    return true;
 }

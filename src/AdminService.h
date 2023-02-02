@@ -26,8 +26,12 @@ public:
 private:
     HttpStatus onModifyDatabase(const HttpRequest &request, HttpResponse &response);
 
+    HttpStatus onUploadWebBundle(const HttpRequest &request, HttpResponse &response);
+
     // task
-    bool onGetTask(const HttpRequest &request, const SqlSelectFilter &filter, DataTable &table);
+    bool onGetTaskList(const HttpRequest &request, const SqlSelectFilter &filter, DataTable &table);
+
+    HttpStatus onGetTask(const HttpRequest &request, HttpResponse &response);
 
     HttpStatus onAddTask(const HttpRequest &request, HttpResponse &response);
 
@@ -38,7 +42,9 @@ private:
     HttpStatus onUpdateTask(const HttpRequest &request, HttpResponse &response);
 
     // label
-    bool onGetLabel(const HttpRequest &request, const SqlSelectFilter &filter, DataTable &table);
+    bool onGetLabelList(const HttpRequest &request, const SqlSelectFilter &filter, DataTable &table);
+
+    HttpStatus onGetLabel(const HttpRequest &request, HttpResponse &response);
 
     HttpStatus onAddLabel(const HttpRequest &request, HttpResponse &response);
 
@@ -47,7 +53,9 @@ private:
     HttpStatus onUpdateLabel(const HttpRequest &request, HttpResponse &response);
 
     // table
-    bool onGetTable(const HttpRequest &request, const SqlSelectFilter &filter, DataTable &table);
+    bool onGetTableList(const HttpRequest &request, const SqlSelectFilter &filter, DataTable &table);
+
+    HttpStatus onGetTable(const HttpRequest &request, HttpResponse &response);
 
     HttpStatus onAddTable(const HttpRequest &request, HttpResponse &response);
 
@@ -58,6 +66,8 @@ private:
     typedef bool (*Method)(const StringMap &, StringMap &);
 
     HttpStatus onAction(const HttpRequest &request, HttpResponse &response, Method method);
+
+    bool uploadWebBundle(const StringMap &request, StringMap &response);
 };
 
 

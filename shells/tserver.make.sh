@@ -38,7 +38,7 @@ if [ ! -d "$SOURCE_PATH/$APP_NAME" ];then
 fi
 
 # compress tserver files.
-tar -czvf "$TARGET_PATH"/tserver.tar.gz "$SOURCE_PATH"/$APP_NAME
+tar -czvf "$TARGET_PATH"/tserver.tar.gz -C "$SOURCE_PATH" $APP_NAME
 
 # combine sh file and tar file.
-cat "$SOURCE_PATH"/tserver.install.source.sh "$SOURCE_PATH"/tserver.tar.gz > "$TARGET_PATH"/tserver.install.sh
+cat "$SOURCE_PATH"/tserver.install.source.sh "$TARGET_PATH"/tserver.tar.gz > "$TARGET_PATH"/tserver.install.sh

@@ -151,12 +151,12 @@ String SimulatorService::Label::toTagsStr() const {
     return result.toString();
 }
 
-bool SimulatorService::Label::findName(const String &name) const {
-    return name.isNullOrEmpty() || this->name.find(name) >= 0;
+bool SimulatorService::Label::findName(const String &n) const {
+    return n.isNullOrEmpty() || this->name.find(n) >= 0;
 }
 
 bool SimulatorService::Label::findTagName(const String &tagNames) const {
-    if(tagNames.isNullOrEmpty()) {
+    if (tagNames.isNullOrEmpty()) {
         return true;
     }
 
@@ -166,12 +166,21 @@ bool SimulatorService::Label::findTagName(const String &tagNames) const {
         const String &text = texts[i];
         for (size_t j = 0; j < tags.count(); ++j) {
             if (tags[j].name.find(text) >= 0) {
-                return false;
+                return true;
             }
         }
     }
+    return false;
+}
 
-    return true;
+JsonNode SimulatorService::Label::toJsonNode() const {
+    JsonNode node;
+    node.add(JsonNode("name", name));
+    node.add(JsonNode("range", toRangeStr()));
+    node.add(JsonNode("step", step));
+    node.add(JsonNode("interval", interval));
+    node.add(JsonNode("tags", toTagsStr()));
+    return node;
 }
 
 bool SimulatorService::Label::parseRange(const String &str, double &minValue, double &maxValue) {
@@ -405,12 +414,12 @@ String SimulatorService::Table::toColumnsStr() const {
     return result.toString();
 }
 
-bool SimulatorService::Table::findName(const String &name) const {
-    return name.isNullOrEmpty() || this->name.find(name) >= 0;
+bool SimulatorService::Table::findName(const String &n) const {
+    return n.isNullOrEmpty() || this->name.find(n) >= 0;
 }
 
 bool SimulatorService::Table::findColumnName(const String &columnNames) const {
-    if(columnNames.isNullOrEmpty()) {
+    if (columnNames.isNullOrEmpty()) {
         return true;
     }
 
@@ -426,6 +435,16 @@ bool SimulatorService::Table::findColumnName(const String &columnNames) const {
     }
 
     return false;
+}
+
+JsonNode SimulatorService::Table::toJsonNode() const {
+    JsonNode node;
+    node.add(JsonNode("name", name));
+    node.add(JsonNode("range", toRangeStr()));
+    node.add(JsonNode("step", step));
+    node.add(JsonNode("rowCount", rowCount));
+    node.add(JsonNode("columns", toColumnsStr()));
+    return node;
 }
 
 bool SimulatorService::Table::parseRange(const String &str, double &minValue, double &maxValue) {
@@ -466,6 +485,16 @@ SimulatorService::SimulatorService() : _timer(nullptr) {
     assert(factory);
     factory->addService<SimulatorService>(this);
 
+    // register codes.
+    HttpCode *hc = HttpCode::instance();
+    hc->registerCode({
+                             {10, "Can not find label by name."},
+                             {11, "Duplicate name."},
+                             {12, "Failed to save config file."},
+                             {13, "Can not find table by name."}
+                     });
+
+    // initialize.
     auto *cs = factory->getService<IConfigService>();
     assert(cs);
 
@@ -685,26 +714,37 @@ bool SimulatorService::getLabels(const SqlSelectFilter &filter, DataTable &table
     return true;
 }
 
-bool SimulatorService::addLabel(const StringMap &request, StringMap &response) {
+bool SimulatorService::getLabel(const StringMap &request, StringMap &response) {
     {
         Locker locker(&_labels);
         String name = request["name"];
         for (size_t i = 0; i < _labels.count(); ++i) {
             const Label &label = _labels[i];
             if (label.name == name) {
-                response["code"] = Int32(531).toString();
-                response["msg"] = "Duplicate name.";
-                return false;
+                response["code"] = "0";
+                response["data"] = label.toJsonNode().toString();
+                return true;
             }
         }
     }
 
-    int position;
-    {
-        Locker locker(&_labels);
-        position = (int) _labels.count();
+    // Can not find label by name.
+    response.addRange(HttpCode::instance()->at(10));
+    return false;
+}
+
+bool SimulatorService::addLabel(const StringMap &request, StringMap &response) {
+    Locker locker(&_labels);
+    String name = request["name"];
+    for (size_t i = 0; i < _labels.count(); ++i) {
+        const Label &label = _labels[i];
+        if (label.name == name) {
+            // Duplicate name.
+            response.addRange(HttpCode::instance()->at(11));
+            return false;
+        }
     }
-    return addOrUpdateLabel(request, response, position);
+    return addOrUpdateLabel(request, response);
 }
 
 bool SimulatorService::removeLabel(const StringMap &request, StringMap &response) {
@@ -727,8 +767,8 @@ bool SimulatorService::removeLabel(const StringMap &request, StringMap &response
         }
     }
     if (!found) {
-        response["code"] = Int32(551).toString();
-        response["msg"] = "Can not find the label name.";
+        // Can not find label by name.
+        response.addRange(HttpCode::instance()->at(10));
         return false;
     }
 
@@ -743,39 +783,34 @@ bool SimulatorService::removeLabel(const StringMap &request, StringMap &response
         updateLabelYmlProperties(false, positions[i], properties);
     }
     if (!cs->updateConfigFile(properties)) {
-        response["code"] = Int32(536).toString();
-        response["msg"] = "Failed to save config file.";
+        // Failed to save config file.
+        response.addRange(HttpCode::instance()->at(12));
         return false;
     }
 
-    response["code"] = Int32(0).toString();
+    response["code"] = "0";
     response["msg"] = String::Empty;
     return true;
 }
 
 bool SimulatorService::updateLabel(const StringMap &request, StringMap &response) {
+    Locker locker(&_labels);
     String name = request["name"];
-
-    // find label name.
     int position;
-    {
-        Locker locker(&_labels);
-        bool found = false;
-        for (size_t i = 0; i < _labels.count(); ++i) {
-            const Label &label = _labels[i];
-            if (label.name == name) {
-                found = true;
-                position = (int) i;
-                break;
-            }
-        }
-        if (!found) {
-            response["code"] = Int32(551).toString();
-            response["msg"] = "Can not find the label name.";
-            return false;
+    bool found = false;
+    for (size_t i = 0; i < _labels.count(); ++i) {
+        const Label &label = _labels[i];
+        if (label.name == name) {
+            found = true;
+            position = (int) i;
+            break;
         }
     }
-
+    if (!found) {
+        // Can not find label by name.
+        response.addRange(HttpCode::instance()->at(10));
+        return false;
+    }
     return addOrUpdateLabel(request, response, position);
 }
 
@@ -794,20 +829,21 @@ bool SimulatorService::addOrUpdateLabel(const StringMap &request, StringMap &res
     assert(cs);
 
     YmlNode::Properties properties;
-    updateYmlProperties(label, position, properties);
+    updateYmlProperties(label, position >= 0 ? position : (int) _labels.count(), properties);
     if (!cs->updateConfigFile(properties)) {
-        response["code"] = Int32(536).toString();
-        response["msg"] = "Failed to save config file.";
+        // Failed to save config file.
+        response.addRange(HttpCode::instance()->at(12));
         return false;
     }
 
     // update labels in memory.
-    {
-        Locker locker(&_labels);
+    if (position >= 0) {
+        _labels.set(position, label);
+    } else {
         _labels.add(label);
     }
 
-    response["code"] = Int32(0).toString();
+    response["code"] = "0";
     response["msg"] = String::Empty;
     return true;
 }
@@ -827,20 +863,21 @@ bool SimulatorService::addOrUpdateTable(const StringMap &request, StringMap &res
     assert(cs);
 
     YmlNode::Properties properties;
-    updateYmlProperties(table, position, properties);
+    updateYmlProperties(table, position >= 0 ? position : (int) _tables.count(), properties);
     if (!cs->updateConfigFile(properties)) {
-        response["code"] = Int32(536).toString();
-        response["msg"] = "Failed to save config file.";
+        // Failed to save config file.
+        response.addRange(HttpCode::instance()->at(12));
         return false;
     }
 
     // update tables in memory.
-    {
-        Locker locker(&_tables);
+    if (position >= 0) {
+        _tables.set(position, table);
+    } else {
         _tables.add(table);
     }
 
-    response["code"] = Int32(0).toString();
+    response["code"] = "0";
     response["msg"] = String::Empty;
     return true;
 }
@@ -876,26 +913,37 @@ bool SimulatorService::getTables(const SqlSelectFilter &filter, DataTable &table
     return true;
 }
 
-bool SimulatorService::addTable(const StringMap &request, StringMap &response) {
+bool SimulatorService::getTable(const StringMap &request, StringMap &response) {
     {
         Locker locker(&_tables);
         String name = request["name"];
         for (size_t i = 0; i < _tables.count(); ++i) {
             const Table &table = _tables[i];
             if (table.name == name) {
-                response["code"] = Int32(531).toString();
-                response["msg"] = "Duplicate name.";
-                return false;
+                response["code"] = "0";
+                response["data"] = table.toJsonNode().toString();
+                return true;
             }
         }
     }
 
-    int position;
-    {
-        Locker locker(&_tables);
-        position = (int) _tables.count();
+    // Can not find table by name.
+    response.addRange(HttpCode::instance()->at(13));
+    return false;
+}
+
+bool SimulatorService::addTable(const StringMap &request, StringMap &response) {
+    Locker locker(&_tables);
+    String name = request["name"];
+    for (size_t i = 0; i < _tables.count(); ++i) {
+        const Table &table = _tables[i];
+        if (table.name == name) {
+            // Duplicate name.
+            response.addRange(HttpCode::instance()->at(11));
+            return false;
+        }
     }
-    return addOrUpdateTable(request, response, position);
+    return addOrUpdateTable(request, response);
 }
 
 bool SimulatorService::removeTable(const StringMap &request, StringMap &response) {
@@ -918,8 +966,8 @@ bool SimulatorService::removeTable(const StringMap &request, StringMap &response
         }
     }
     if (!found) {
-        response["code"] = Int32(561).toString();
-        response["msg"] = "Can not find the table name.";
+        // Can not find table by name.
+        response.addRange(HttpCode::instance()->at(13));
         return false;
     }
 
@@ -934,39 +982,35 @@ bool SimulatorService::removeTable(const StringMap &request, StringMap &response
         updateTableYmlProperties(false, positions[i], properties);
     }
     if (!cs->updateConfigFile(properties)) {
-        response["code"] = Int32(536).toString();
-        response["msg"] = "Failed to save config file.";
+        // Failed to save config file.
+        response.addRange(HttpCode::instance()->at(12));
         return false;
     }
 
-    response["code"] = Int32(0).toString();
+    response["code"] = "0";
     response["msg"] = String::Empty;
     return true;
 }
 
 bool SimulatorService::updateTable(const StringMap &request, StringMap &response) {
-    String name = request["name"];
-
     // find table name.
+    Locker locker(&_tables);
+    String name = request["name"];
     int position;
-    {
-        Locker locker(&_tables);
-        bool found = false;
-        for (size_t i = 0; i < _tables.count(); ++i) {
-            const Table &table = _tables[i];
-            if (table.name == name) {
-                found = true;
-                position = (int) i;
-                break;
-            }
-        }
-        if (!found) {
-            response["code"] = Int32(551).toString();
-            response["msg"] = "Can not find the table name.";
-            return false;
+    bool found = false;
+    for (size_t i = 0; i < _tables.count(); ++i) {
+        const Table &table = _tables[i];
+        if (table.name == name) {
+            found = true;
+            position = (int) i;
+            break;
         }
     }
-
+    if (!found) {
+        // Can not find table by name.
+        response.addRange(HttpCode::instance()->at(13));
+        return false;
+    }
     return addOrUpdateTable(request, response, position);
 }
 

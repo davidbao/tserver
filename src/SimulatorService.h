@@ -65,9 +65,11 @@ public:
 
         String toTagsStr() const;
 
-        bool findName(const String &name) const;
+        bool findName(const String &n) const;
 
         bool findTagName(const String &tagNames) const;
+
+        JsonNode toJsonNode() const;
 
     public:
         static bool parseRange(const String &str, double &minValue, double &maxValue);
@@ -130,9 +132,11 @@ public:
 
         String toColumnsStr() const;
 
-        bool findName(const String &name) const;
+        bool findName(const String &n) const;
 
         bool findColumnName(const String &columnNames) const;
+
+        JsonNode toJsonNode() const;
 
     public:
         static bool parseRange(const String &str, double &minValue, double &maxValue);
@@ -153,6 +157,8 @@ public:
     // Labels
     bool getLabels(const SqlSelectFilter &filter, DataTable &table);
 
+    bool getLabel(const StringMap &request, StringMap &response);
+
     bool addLabel(const StringMap &request, StringMap &response);
 
     bool removeLabel(const StringMap &request, StringMap &response);
@@ -161,6 +167,8 @@ public:
 
     // Tables
     bool getTables(const SqlSelectFilter &filter, DataTable &table);
+
+    bool getTable(const StringMap &request, StringMap &response);
 
     bool addTable(const StringMap &request, StringMap &response);
 
@@ -179,9 +187,9 @@ private:
 
     void labelTimeUp();
 
-    bool addOrUpdateLabel(const StringMap &request, StringMap &response, int position);
+    bool addOrUpdateLabel(const StringMap &request, StringMap &response, int position = -1);
 
-    bool addOrUpdateTable(const StringMap &request, StringMap &response, int position);
+    bool addOrUpdateTable(const StringMap &request, StringMap &response, int position = -1);
 
 private:
     static void updateYmlProperties(const Label &label, int position, YmlNode::Properties &properties);

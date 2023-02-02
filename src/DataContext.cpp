@@ -7,3 +7,37 @@
 //
 
 #include "DataContext.h"
+
+HttpCode::HttpCode() {
+    registerCode({
+                         {0, String::Empty},
+                         {9, "Unknown"}
+                 });
+}
+
+void HttpCode::registerCode(int code, const String &msg) {
+    _codes[code] = msg;
+}
+
+void HttpCode::registerCode(std::initializer_list<Item> list) {
+    for (const Item *code = list.begin(); code < list.end(); ++code) {
+        _codes[code->code] = code->msg;
+    }
+}
+
+String HttpCode::getMessage(int code) const {
+    return _codes[code];
+}
+
+StringMap HttpCode::at(int code) const {
+    StringMap result;
+    if (_codes.contains(code)) {
+        result["code"] = Int32(code).toString();
+        result["msg"] = _codes[code];
+    }
+    return result;
+}
+
+HttpCode *HttpCode::instance() {
+    return Singleton<HttpCode>::instance();
+}

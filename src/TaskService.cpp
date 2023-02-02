@@ -18,6 +18,7 @@
 #include "crypto/Md5Provider.h"
 #include "IO/Zip.h"
 #include "TaskService.h"
+#include "DataContext.h"
 
 using namespace IO;
 using namespace Config;
@@ -63,6 +64,15 @@ DataRow TaskService::CycleTask::toDataRow(const DataTable &table) const {
 
 String TaskService::CycleTask::type() const {
     return "cycle";
+}
+
+JsonNode TaskService::CycleTask::toJsonNode() const {
+    JsonNode node;
+    node.add(JsonNode("name", name));
+    node.add(JsonNode("app", app));
+    node.add(JsonNode("param", param));
+    node.add(JsonNode("interval", interval));
+    return node;
 }
 
 TaskService::TimeTask::TimeTask(const String &path) : Task(path) {
@@ -125,6 +135,17 @@ DataRow TaskService::TimeTask::toDataRow(const DataTable &table) const {
 
 String TaskService::TimeTask::type() const {
     return "time";
+}
+
+JsonNode TaskService::TimeTask::toJsonNode() const {
+    JsonNode node;
+    node.add(JsonNode("name", name));
+    node.add(JsonNode("app", app));
+    node.add(JsonNode("param", param));
+    node.add(JsonNode("time", time));
+    node.add(JsonNode("repeatType", repeatType));
+    node.add(JsonNode("repeatValue", repeatValue));
+    return node;
 }
 
 StringArray TaskService::TimeTask::allRepeatTypes() {
@@ -228,6 +249,20 @@ TaskService::TaskService() : _timer(nullptr) {
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
     factory->addService<TaskService>(this);
+
+    // register codes.
+    HttpCode *hc = HttpCode::instance();
+    hc->registerCode({
+                             {20, "Can not find task by name."},
+                             {21, "Can not find the upload file."},
+                             {22, "Failed to verify the upload file md5."},
+                             {23, "Can not extract the zip file."},
+                             {24, "Can not copy the app file."},
+                             {25, "Cycle interval is invalid."},
+                             {26, "Time interval is invalid."},
+                             {27, "Repeat type is invalid."},
+                             {28, "Can not find task type."}
+                     });
 }
 
 TaskService::~TaskService() {
@@ -380,33 +415,44 @@ bool TaskService::getTasks(const SqlSelectFilter &filter, DataTable &table) {
     return true;
 }
 
-bool TaskService::addTask(const StringMap &request, StringMap &response) {
+bool TaskService::getTask(const StringMap &request, StringMap &response) {
     {
         Locker locker(&_tasks);
         String name = request["name"];
         for (size_t i = 0; i < _tasks.count(); ++i) {
             const Task *task = _tasks[i];
             if (task->name == name) {
-                response["code"] = Int32(531).toString();
-                response["msg"] = "Duplicate name.";
-                return false;
+                response["code"] = "0";
+                response["data"] = task->toJsonNode().toString();
+                return true;
             }
         }
     }
 
-    int position;
-    {
-        Locker locker(&_tasks);
-        position = (int) _tasks.count();
-    }
+    // Can not find task by name.
+    response.addRange(HttpCode::instance()->at(20));
+    return false;
+}
 
-    return addOrUpdateTask(request, response, position);
+bool TaskService::addTask(const StringMap &request, StringMap &response) {
+    Locker locker(&_tasks);
+    String name = request["name"];
+    for (size_t i = 0; i < _tasks.count(); ++i) {
+        const Task *task = _tasks[i];
+        if (task->name == name) {
+            // Duplicate name.
+            response.addRange(HttpCode::instance()->at(11));
+            return false;
+        }
+    }
+    return addOrUpdateTask(request, response);
 }
 
 bool TaskService::addTaskApp(const StringMap &request, StringMap &response) {
     String name = request["name"];
     String md5 = request["md5"];
     String fullFileName = request["fullFileName"];
+    String app;
 
     // find app name.
     {
@@ -416,20 +462,21 @@ bool TaskService::addTaskApp(const StringMap &request, StringMap &response) {
             const Task *task = _tasks[i];
             if (task->name == name) {
                 found = true;
+                app = !task->app.isNullOrEmpty() ? task->app : task->name;
                 break;
             }
         }
         if (!found) {
-            response["code"] = Int32(537).toString();
-            response["msg"] = "Can not find the app name.";
+            // Can not find task by name.
+            response.addRange(HttpCode::instance()->at(20));
             return false;
         }
     }
 
     // file exist?
     if (!File::exists(fullFileName)) {
-        response["code"] = Int32(538).toString();
-        response["msg"] = "Can not find the upload file.";
+        // Can not find the upload file.
+        response.addRange(HttpCode::instance()->at(21));
         return false;
     }
 
@@ -438,30 +485,39 @@ bool TaskService::addTaskApp(const StringMap &request, StringMap &response) {
         String actual;
         if (Md5Provider::computeFileHash(fullFileName, actual)) {
             if (!String::equals(actual, md5, true)) {
-                response["code"] = Int32(539).toString();
-                response["msg"] = "Failed to verify md5.";
+                // Failed to verify the upload file md5.
+                response.addRange(HttpCode::instance()->at(22));
                 return false;
             }
         }
     }
 
-    // extract app.
+    // check task app path.
     String path = Path::combine(getAppPath(), name);
+    if (!Directory::exists(path)) {
+        Directory::createDirectory(path);
+    }
 
     // extract or copy app, check zip first.
     Zip zip(fullFileName);
     if (zip.isValid()) {
         if (!Zip::extract(fullFileName, path)) {
-            response["code"] = Int32(540).toString();
-            response["msg"] = "Can not extract the zip file.";
+            if (Directory::exists(path)) {
+                Directory::deleteDirectory(path);
+            }
+            // Can not extract the zip file.
+            response.addRange(HttpCode::instance()->at(23));
             return false;
         }
     } else {
         // not a zip file.
-        String destFileName = Path::combine(path, name);
+        String destFileName = Path::combine(path, app);
         if (!File::copy(fullFileName, destFileName, true)) {
-            response["code"] = Int32(541).toString();
-            response["msg"] = "Can not copy the app file.";
+            if (Directory::exists(path)) {
+                Directory::deleteDirectory(path);
+            }
+            // Can not copy the app file.
+            response.addRange(HttpCode::instance()->at(24));
             return false;
         }
     }
@@ -475,7 +531,7 @@ bool TaskService::addTaskApp(const StringMap &request, StringMap &response) {
     }
 #endif
 
-    response["code"] = Int32(0).toString();
+    response["code"] = "0";
     response["msg"] = String::Empty;
     return true;
 }
@@ -490,7 +546,7 @@ bool TaskService::removeTask(const StringMap &request, StringMap &response) {
     Vector<int> positions;
     for (int i = (int) _tasks.count() - 1; i >= 0; --i) {
         const Task *task = _tasks[i];
-        for (size_t j = 0; j < _tasks.count(); ++j) {
+        for (size_t j = 0; j < names.count(); ++j) {
             if (task->name == names[j]) {
                 positions.add((int) i);
                 _tasks.removeAt(i);
@@ -500,8 +556,8 @@ bool TaskService::removeTask(const StringMap &request, StringMap &response) {
         }
     }
     if (!found) {
-        response["code"] = Int32(537).toString();
-        response["msg"] = "Can not find the app name.";
+        // Can not find task by name.
+        response.addRange(HttpCode::instance()->at(20));
         return false;
     }
 
@@ -516,39 +572,43 @@ bool TaskService::removeTask(const StringMap &request, StringMap &response) {
         updateYmlProperties(false, positions[i], properties);
     }
     if (!cs->updateConfigFile(properties)) {
-        response["code"] = Int32(536).toString();
-        response["msg"] = "Failed to save config file.";
+        // Failed to save config file.
+        response.addRange(HttpCode::instance()->at(12));
         return false;
     }
 
-    response["code"] = Int32(0).toString();
+    // remove task app path.
+    for (size_t i = 0; i < names.count(); ++i) {
+        const String &name = names[i];
+        String path = Path::combine(getAppPath(), name);
+        if (Directory::exists(path)) {
+            Directory::deleteDirectory(path);
+        }
+    }
+
+    response["code"] = "0";
     response["msg"] = String::Empty;
     return true;
 }
 
 bool TaskService::updateTask(const StringMap &request, StringMap &response) {
+    Locker locker(&_tasks);
     String name = request["name"];
-
-    // find app name.
     int position;
-    {
-        Locker locker(&_tasks);
-        bool found = false;
-        for (size_t i = 0; i < _tasks.count(); ++i) {
-            const Task *task = _tasks[i];
-            if (task->name == name) {
-                found = true;
-                position = (int) i;
-                break;
-            }
-        }
-        if (!found) {
-            response["code"] = Int32(537).toString();
-            response["msg"] = "Can not find the app name.";
-            return false;
+    bool found = false;
+    for (size_t i = 0; i < _tasks.count(); ++i) {
+        const Task *task = _tasks[i];
+        if (task->name == name) {
+            found = true;
+            position = (int) i;
+            break;
         }
     }
-
+    if (!found) {
+        // Can not find task by name.
+        response.addRange(HttpCode::instance()->at(20));
+        return false;
+    }
     return addOrUpdateTask(request, response, position);
 }
 
@@ -567,20 +627,20 @@ bool TaskService::addOrUpdateTask(const StringMap &request, StringMap &response,
             t->interval = interval;
             task = t;
         } else {
-            response["code"] = Int32(533).toString();
-            response["msg"] = "Cycle interval is invalid.";
+            // Cycle interval is invalid.
+            response.addRange(HttpCode::instance()->at(25));
             return false;
         }
     } else if (type == "time") {
         DateTime time;
         if (!(DateTime::parse(request["time"], time) && time != DateTime::MinValue)) {
-            response["code"] = Int32(534).toString();
-            response["msg"] = "Time is invalid.";
+            // Time interval is invalid.
+            response.addRange(HttpCode::instance()->at(26));
             return false;
         }
         if (!TimeTask::allRepeatTypes().contains(request["repeatType"], true)) {
-            response["code"] = Int32(535).toString();
-            response["msg"] = "Repeat type is invalid.";
+            // Repeat type is invalid.
+            response.addRange(HttpCode::instance()->at(27));
             return false;
         }
 
@@ -593,8 +653,8 @@ bool TaskService::addOrUpdateTask(const StringMap &request, StringMap &response,
         t->repeatValue = request["repeatValue"];
         task = t;
     } else {
-        response["code"] = Int32(532).toString();
-        response["msg"] = "Can not find task type.";
+        // Can not find task type.
+        response.addRange(HttpCode::instance()->at(28));
         return false;
     }
 
@@ -609,14 +669,15 @@ bool TaskService::addOrUpdateTask(const StringMap &request, StringMap &response,
         updateYmlProperties(task, position, properties);
         if (!cs->updateConfigFile(properties)) {
             delete task;    // Don't forget it.
-            response["code"] = Int32(536).toString();
-            response["msg"] = "Failed to save config file.";
+            // Failed to save config file.
+            response.addRange(HttpCode::instance()->at(12));
             return false;
         }
 
         // update tasks in memory.
-        {
-            Locker locker(&_tasks);
+        if (position >= 0) {
+            _tasks.set(position, task);
+        } else {
             _tasks.add(task);
         }
 
@@ -632,7 +693,7 @@ bool TaskService::addOrUpdateTask(const StringMap &request, StringMap &response,
         response["needUploadApp"] = Boolean(needUploadApp).toString();
     }
 
-    response["code"] = Int32(0).toString();
+    response["code"] = "0";
     response["msg"] = String::Empty;
     return true;
 }

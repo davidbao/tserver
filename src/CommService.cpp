@@ -27,7 +27,7 @@ bool CommService::initialize() {
     auto *hs = factory->getService<IHttpRegister>();
     assert(hs);
 
-#define BasePath "v1/api/business"
+#define BasePath "tserver/v1/catalog"
     hs->registerMapping(HttpMethod::Post, BasePath "/exchange",
                         HttpCallback<CommService>(this, &CommService::onExchange));
 
@@ -37,15 +37,15 @@ bool CommService::initialize() {
     const String appPath = Path::getAppPath();
     bundlePath = Path::combine(appPath, admin_bundle_str);
     if (Directory::exists(bundlePath)) {
-        hs->registerWebPath(bundlePath);
     } else {
         Application *app = Application::instance();
         assert(app);
         bundlePath = Path::combine(app->rootPath(), admin_bundle_str);
-        if (Directory::exists(bundlePath)) {
-            hs->registerWebPath(bundlePath);
+        if (!Directory::exists(bundlePath)) {
+            Directory::createDirectory(bundlePath);
         }
     }
+    hs->registerWebPath(bundlePath);
 
     return SsoService::initialize();
 }

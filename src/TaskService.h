@@ -36,6 +36,8 @@ public:
 
         virtual String type() const = 0;
 
+        virtual JsonNode toJsonNode() const = 0;
+
         void invoke();
 
     private:
@@ -58,6 +60,8 @@ public:
 
         String type() const override;
 
+        JsonNode toJsonNode() const override;
+
     private:
         uint32_t _tick;
     };
@@ -77,6 +81,8 @@ public:
         DataRow toDataRow(const DataTable &table) const override;
 
         String type() const override;
+
+        JsonNode toJsonNode() const override;
 
     public:
         static StringArray allRepeatTypes();
@@ -99,6 +105,8 @@ public:
 
     bool getTasks(const SqlSelectFilter &filter, DataTable &table);
 
+    bool getTask(const StringMap &request, StringMap &response);
+
     bool addTask(const StringMap &request, StringMap &response);
 
     bool addTaskApp(const StringMap &request, StringMap &response);
@@ -112,7 +120,7 @@ private:
 
     void taskTimeUp();
 
-    bool addOrUpdateTask(const StringMap &request, StringMap &response, int position);
+    bool addOrUpdateTask(const StringMap &request, StringMap &response, int position = -1);
 
 private:
     static String getAppPath();
