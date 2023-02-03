@@ -28,8 +28,24 @@ public:
 
     FetchResult getTableValues(const JsonNode &request, JsonNode &response);
 
+    bool getType(const StringMap &request, StringMap &response);
+
+    bool setType(const StringMap &request, StringMap &response);
+
 private:
-    IDataProvider* _provider;
+    String type() const;
+
+    IDataProvider *createProvider(const String &type);
+
+    IDataProvider *provider() const;
+
+private:
+    static bool isTypeValid(const String &type);
+
+private:
+    IDataProvider *_provider;
+
+    PList<IDataProvider> _deletedProviders;
 };
 
 

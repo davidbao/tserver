@@ -24,9 +24,16 @@ public:
     bool unInitialize();
 
 private:
-    HttpStatus onModifyDatabase(const HttpRequest &request, HttpResponse &response);
+    // exchange
+    HttpStatus onGetExchangeType(const HttpRequest &request, HttpResponse &response);
 
+    HttpStatus onSetExchangeType(const HttpRequest &request, HttpResponse &response);
+
+    // web
     HttpStatus onUploadWebBundle(const HttpRequest &request, HttpResponse &response);
+
+    // database
+    HttpStatus onModifyDatabase(const HttpRequest &request, HttpResponse &response);
 
     // task
     bool onGetTaskList(const HttpRequest &request, const SqlSelectFilter &filter, DataTable &table);
@@ -63,6 +70,7 @@ private:
 
     HttpStatus onUpdateTable(const HttpRequest &request, HttpResponse &response);
 
+private:
     typedef bool (*Method)(const StringMap &, StringMap &);
 
     HttpStatus onAction(const HttpRequest &request, HttpResponse &response, Method method);

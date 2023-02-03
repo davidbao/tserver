@@ -15,10 +15,11 @@
 
 using namespace Config;
 
-SimulatorService::Tag::Tag(const String &registerStr) : registerStr(registerStr), value(Variant::Null) {
+SimulatorService::Tag::Tag(const String &registerStr) : registerStr(registerStr), value(Variant::Null),
+                                                        _oldValue(Double::NaN) {
 }
 
-SimulatorService::Tag::Tag(const Tag &tag) {
+SimulatorService::Tag::Tag(const Tag &tag) : _oldValue(Double::NaN) {
     Tag::evaluates(tag);
 }
 
@@ -68,6 +69,49 @@ void SimulatorService::Tag::runOnce(const Label *label) {
             value = Variant(Variant::Float64);
         }
         value = Random::getRandValue(label->minValue, label->maxValue);
+    } else if (String::equals(registerStr, "sin", true)) {
+        if (value.isNullType()) {
+            value = Variant(Variant::Float64);
+        }
+        double oldValue = _oldValue;
+        if (Double::isNaN(oldValue))
+            oldValue = 0.0;
+        else
+            oldValue = oldValue + label->step;
+        if (oldValue > 360.0)
+            oldValue = 0.0;
+        _oldValue = oldValue;
+        double scope = label->maxValue - label->minValue + label->step;
+        double v = label->minValue + scope * (Math::sin(oldValue) + 1.0) / 2.0;
+        if (v < label->minValue)
+            v = label->minValue;
+        if (v > label->maxValue)
+            v = label->maxValue;
+        value = v;
+    } else if (String::equals(registerStr, "cos", true)) {
+        if (value.isNullType()) {
+            value = Variant(Variant::Float64);
+        }
+        double oldValue = _oldValue;
+        if (Double::isNaN(oldValue))
+            oldValue = 0.0;
+        else
+            oldValue = oldValue + label->step;
+        if (oldValue > 360.0)
+            oldValue = 0.0;
+        _oldValue = oldValue;
+        double scope = label->maxValue - label->minValue + label->step;
+        double v = label->minValue + scope * (Math::cos(oldValue) + 1.0) / 2.0;
+        if (v < label->minValue)
+            v = label->minValue;
+        if (v > label->maxValue)
+            v = label->maxValue;
+        value = v;
+    } else if (String::equals(registerStr, "onoff", true)) {
+        if (value.isNullType()) {
+            value = Variant(Variant::Bool);
+        }
+        value = !value;
     } else if (String::equals(registerStr, "uuid", true)) {
         if (value.isNullType()) {
             value = Variant(Variant::Text);
@@ -220,12 +264,18 @@ SimulatorService::Column::Column(const String &name, const String &registerStr, 
     this->name = name;
     this->registerStr = registerStr;
     this->style = style;
-    if (String::equals(registerStr, "time", true)) {
+    if (String::equals(registerStr, "time", true) ||
+        String::equals(registerStr, "array", true) ||
+        String::equals(registerStr, "uuid", true)) {
         this->value = Variant(ValueTypes::Text);
     } else if (String::equals(registerStr, "increase", true) ||
                String::equals(registerStr, "decrease", true) ||
-               String::equals(registerStr, "random", true)) {
+               String::equals(registerStr, "random", true) ||
+               String::equals(registerStr, "sin", true) ||
+               String::equals(registerStr, "cos", true)) {
         this->value = Variant(ValueTypes::Float64);
+    } else if (String::equals(registerStr, "onoff", true)) {
+        this->value = Variant(ValueTypes::Bool);
     } else {
         double v;
         if (Double::parse(registerStr, v)) {
@@ -267,6 +317,29 @@ String SimulatorService::Column::getValue(const Table *table, const SqlSelectFil
     } else if (String::equals(registerStr, "random", true)) {
         double v = Random::getRandValue(table->minValue, table->maxValue);
         result = Double(v).toString();
+    } else if (String::equals(registerStr, "sin", true)) {
+        double v = table->minValue;
+        v += table->step * row;
+        double scope = table->maxValue - table->minValue + table->step;
+        v = table->minValue + scope * (Math::sin(v) + 1.0) / 2.0;
+        if (v < table->minValue)
+            v = table->minValue;
+        if (v > table->maxValue)
+            v = table->maxValue;
+        result = Double(v).toString();
+    } else if (String::equals(registerStr, "cos", true)) {
+        double v = table->minValue;
+        v += table->step * row;
+        double scope = table->maxValue - table->minValue + table->step;
+        v = table->minValue + scope * (Math::cos(v) + 1.0) / 2.0;
+        if (v < table->minValue)
+            v = table->minValue;
+        if (v > table->maxValue)
+            v = table->maxValue;
+        result = Double(v).toString();
+    } else if (String::equals(registerStr, "onoff", true)) {
+        bool v = (row % 2) == 0;
+        result = Boolean(v).toString();
     } else if (String::equals(registerStr, "time", true)) {
         if (!style.isNullOrEmpty()) {
             DateTime minValue, maxValue;
@@ -298,10 +371,10 @@ String SimulatorService::Column::getValue(const Table *table, const SqlSelectFil
 //                            printf("yesterday minValue: %s, maxValue: %s\n", minValue.toString().c_str(), maxValue.toString().c_str());
                         } else {
                             StringArray ranges;
-                            StringArray::parse(v, ranges, ';');
+                            StringArray::parse(v, ranges, '-');
                             if (ranges.count() == 2) {
                                 DateTime::parse(ranges[0], minValue);
-                                DateTime::parse(ranges[2], maxValue);
+                                DateTime::parse(ranges[1], maxValue);
                             }
                         }
                     } else if (String::equals(n, "step", true)) {
@@ -317,17 +390,7 @@ String SimulatorService::Column::getValue(const Table *table, const SqlSelectFil
                 DateTime v = minValue.addTicks(step.ticks() * row);
                 result = v.toString(format);
             }
-        }/* else {
-            DateTime timeFrom;
-            DateTime::parse(filter.getValue(String::format("%s.from", name.c_str())), timeFrom);
-            DateTime timeTo;
-            DateTime::parse(filter.getValue(String::format("%s.to", name.c_str())), timeTo);
-            if (timeTo > timeFrom) {
-                TimeSpan interval = TimeSpan::fromTicks((timeTo.ticks() - timeFrom.ticks()) / table->rowCount);
-                DateTime v = timeFrom.addTicks(interval.ticks() * row);
-                result = v.toString();
-            }
-        }*/
+        }
     } else if (String::equals(registerStr, "array", true)) {
         StringArray texts;
         StringArray::parse(style, texts, ';');
@@ -672,12 +735,12 @@ void SimulatorService::stopSimulator() {
 void SimulatorService::labelTimeUp() {
     Locker locker(&_labels);
     for (size_t i = 0; i < _labels.count(); i++) {
-        Label &group = _labels[i];
-        if (group.isTimeUp()) {
-            for (size_t j = 0; j < group.tags.count(); j++) {
-                Tag &tag = group.tags[j];
-                tag.runOnce(&group);
-//                printf("tag('%s.%s') value: %s\n", group.name.c_str(), tag.name.c_str(), tag.value.valueStr().c_str());
+        Label &label = _labels[i];
+        if (label.isTimeUp()) {
+            for (size_t j = 0; j < label.tags.count(); j++) {
+                Tag &tag = label.tags[j];
+                tag.runOnce(&label);
+//                printf("tag('%s.%s') value: %s\n", label.name.c_str(), tag.name.c_str(), tag.value.valueStr().c_str());
             }
         }
     }

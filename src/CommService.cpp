@@ -27,7 +27,7 @@ bool CommService::initialize() {
     auto *hs = factory->getService<IHttpRegister>();
     assert(hs);
 
-#define BasePath "tserver/v1/catalog"
+#define BasePath "v1/catalog"
     hs->registerMapping(HttpMethod::Post, BasePath "/exchange",
                         HttpCallback<CommService>(this, &CommService::onExchange));
 

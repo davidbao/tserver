@@ -36,6 +36,9 @@ public:
         void evaluates(const Tag &other) override;
 
         void runOnce(const Label *label);
+
+    private:
+        double _oldValue;
     };
 
     typedef List<Tag> Tags;

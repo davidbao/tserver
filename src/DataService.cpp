@@ -17,6 +17,13 @@ DataService::DataService() : _provider(nullptr) {
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
     factory->addService<DataService>(this);
+
+    // register codes.
+    HttpCode *hc = HttpCode::instance();
+    hc->registerCode({
+                             {40, "Can not find exchange type."},
+                             {41, "The current type is invalid."}
+                     });
 }
 
 DataService::~DataService() {
@@ -24,36 +31,63 @@ DataService::~DataService() {
     assert(factory);
     factory->removeService<DataService>();
 
-    delete _provider;
-    _provider = nullptr;
+    if (_provider != nullptr) {
+        delete _provider;
+        _provider = nullptr;
+    }
 }
 
 bool DataService::initialize() {
-    ServiceFactory *factory = ServiceFactory::instance();
-    assert(factory);
-    IConfigService *cs = factory->getService<IConfigService>();
-    assert(cs);
-
-    String type;
-    cs->getProperty("summer.exchange.type", type);
-    if (String::equals(type, "simulator", true)) {
-        _provider = new SimulatorService();
-    } else if (String::equals(type, "database", true)) {
-        _provider = new StorageService();
-    }
+    _provider = createProvider(type());
 
     return true;
 }
 
 bool DataService::unInitialize() {
-    delete _provider;
-    _provider = nullptr;
+    if (_provider != nullptr) {
+        delete _provider;
+        _provider = nullptr;
+    }
 
     return true;
 }
 
+String DataService::type() const {
+    ServiceFactory *factory = ServiceFactory::instance();
+    assert(factory);
+    auto *cs = factory->getService<IConfigService>();
+    assert(cs);
+
+    String type;
+    cs->getProperty("summer.exchange.type", type);
+    return isTypeValid(type) ? type : String::Empty;
+}
+
+bool DataService::isTypeValid(const String &type) {
+    if (String::equals(type, "simulator", true) ||
+        String::equals(type, "database", true)) {
+        return true;
+    }
+    return false;
+}
+
+IDataProvider *DataService::createProvider(const String &type) {
+    IDataProvider *provider = nullptr;
+    if (String::equals(type, "simulator", true)) {
+        provider = new SimulatorService();
+    } else if (String::equals(type, "database", true)) {
+        provider = new StorageService();
+    }
+    return provider;
+}
+
+IDataProvider *DataService::provider() const {
+    return _provider;
+}
+
 FetchResult DataService::getLabelValues(const JsonNode &request, JsonNode &response) {
-    if (_provider == nullptr) {
+    IDataProvider *provider = this->provider();
+    if (provider == nullptr) {
         return FetchResult::ConfigError;
     }
 
@@ -68,7 +102,7 @@ FetchResult DataService::getLabelValues(const JsonNode &request, JsonNode &respo
                 StringArray tags;
                 node.getAttribute("tags", tags);
                 StringMap values;
-                FetchResult result = _provider->getLabelValues(name, tags, values);
+                FetchResult result = provider->getLabelValues(name, tags, values);
                 JsonNode iNode("item");
                 iNode.add(JsonNode("name", name));
                 iNode.add(JsonNode("errorCode", (int) result));
@@ -91,7 +125,8 @@ FetchResult DataService::getLabelValues(const JsonNode &request, JsonNode &respo
 }
 
 FetchResult DataService::getTableValues(const JsonNode &request, JsonNode &response) {
-    if (_provider == nullptr) {
+    IDataProvider *provider = this->provider();
+    if (provider == nullptr) {
         return FetchResult::ConfigError;
     }
 
@@ -106,14 +141,13 @@ FetchResult DataService::getTableValues(const JsonNode &request, JsonNode &respo
                 SqlSelectFilter filter;
                 if (SqlSelectFilter::parse(node["condition"].toString(), filter)) {
                     DataTable table("rows");
-                    FetchResult result = _provider->getTableValues(name, filter, table);
+                    FetchResult result = provider->getTableValues(name, filter, table);
                     JsonNode iNode("item");
                     iNode.add(JsonNode("name", name));
                     iNode.add(JsonNode("errorCode", (int) result));
                     if (result == FetchResult::Succeed) {
-                        iNode.add(JsonNode("page", filter.page()));
+                        iNode.add(JsonNode("pageNo", filter.page()));
                         iNode.add(JsonNode("pageSize", filter.pageSize()));
-//                        iNode.add(JsonNode("pageOffset", Int32(filter.offset()).toString()));
                         int pageCount = filter.pageSize() > 0 ?
                                         (table.totalCount() / filter.pageSize() + (
                                                 table.totalCount() % filter.pageSize() == 0 ? 0 : 1)) : 0;
@@ -134,4 +168,58 @@ FetchResult DataService::getTableValues(const JsonNode &request, JsonNode &respo
     }
 
     return FetchResult::JsonError;
+}
+
+bool DataService::getType(const StringMap &request, StringMap &response) {
+    String type = this->type();
+    if (!type.isNullOrEmpty()) {
+        JsonNode data;
+        data.add(JsonNode("type", type));
+        response["data"] = data.toString();
+        return true;
+    }
+    // The current type is invalid.
+    response.addRange(HttpCode::instance()->at(41));
+    return false;
+}
+
+bool DataService::setType(const StringMap &request, StringMap &response) {
+    String type = request["type"];
+    if (isTypeValid(type)) {
+        // update profile yml file.
+        ServiceFactory *factory = ServiceFactory::instance();
+        assert(factory);
+        auto *cs = factory->getService<IConfigService>();
+        assert(cs);
+
+        YmlNode::Properties properties;
+        properties.add("summer.exchange.type", type);
+        if (!cs->updateConfigFile(properties)) {
+            // Failed to save config file.
+            response.addRange(HttpCode::instance()->at(12));
+            return false;
+        }
+
+        // create a provider by type.
+        IDataProvider *provider = createProvider(type);
+        assert(provider);
+        if (_provider != nullptr) {
+            _deletedProviders.add(_provider);
+            _provider = provider;
+            if (_deletedProviders.count() > 1) {
+                _deletedProviders.removeAt(0);
+            }
+        } else {
+            _provider = provider;
+        }
+
+        response["code"] = "0";
+        response["msg"] = String::Empty;
+        return true;
+    } else {
+        // Can not find exchange type.
+        response.addRange(HttpCode::instance()->at(40));
+    }
+
+    return false;
 }

@@ -41,6 +41,7 @@ class HttpCode {
 public:
     enum Code {
         Success = 0,
+        JsonParseError = 1,
         Unknown = 9
     };
 

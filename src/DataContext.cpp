@@ -10,8 +10,9 @@
 
 HttpCode::HttpCode() {
     registerCode({
-                         {0, String::Empty},
-                         {9, "Unknown"}
+                         {Success, String::Empty},
+                         {JsonParseError, "Json string parse error."},
+                         {Unknown, "Unknown"}
                  });
 }
 
