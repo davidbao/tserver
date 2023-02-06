@@ -12,6 +12,7 @@
 #include "system/ServiceFactory.h"
 #include "system/Application.h"
 #include "microservice/HttpService.h"
+#include "configuration/ConfigService.h"
 #include "DataService.h"
 
 using namespace Data;
@@ -32,20 +33,14 @@ bool CommService::initialize() {
                         HttpCallback<CommService>(this, &CommService::onExchange));
 
     // register web server.
-    static const char *admin_bundle_str = "www.bundle";
-    String bundlePath;
-    const String appPath = Path::getAppPath();
-    bundlePath = Path::combine(appPath, admin_bundle_str);
-    if (Directory::exists(bundlePath)) {
-    } else {
-        Application *app = Application::instance();
-        assert(app);
-        bundlePath = Path::combine(app->rootPath(), admin_bundle_str);
-        if (!Directory::exists(bundlePath)) {
-            Directory::createDirectory(bundlePath);
-        }
+    auto *cs = factory->getService<IConfigService>();
+    assert(cs);
+    bool enable = true;
+    cs->getProperty("summer.web.enable", enable);
+    if (enable) {
+        String bundlePath = getBundlePath();
+        hs->registerWebPath(bundlePath);
     }
-    hs->registerWebPath(bundlePath);
 
     return SsoService::initialize();
 }
@@ -61,6 +56,22 @@ bool CommService::unInitialize() {
     hs->removeMapping(this);
 
     return true;
+}
+
+String CommService::getBundlePath() {
+    String bundlePath;
+    const String appPath = Path::getAppPath();
+    bundlePath = Path::combine(appPath, www_bundle_str);
+    if (Directory::exists(bundlePath)) {
+    } else {
+        Application *app = Application::instance();
+        assert(app);
+        bundlePath = Path::combine(app->rootPath(), www_bundle_str);
+        if (!Directory::exists(bundlePath)) {
+            Directory::createDirectory(bundlePath);
+        }
+    }
+    return bundlePath;
 }
 
 HttpStatus CommService::onExchange(const HttpRequest &request, HttpResponse &response) {

@@ -10,11 +10,12 @@
 #define TSERVER_DATACONTEXT_H
 
 #include "json/JsonNode.h"
+#include "http/HttpContent.h"
 #include "database/DataTable.h"
 #include "database/SqlSelectFilter.h"
-#include "system/Singleton.h"
 
 using namespace Data;
+using namespace Http;
 using namespace Database;
 using namespace System;
 
@@ -37,42 +38,56 @@ public:
     virtual FetchResult getTableValues(const String &tableName, const SqlSelectFilter &filter, DataTable &table) = 0;
 };
 
-class HttpCode {
+enum HttpErrorCode {
+    // simulator
+    CannotFindLabel = 50,           // Can not find label by name.
+    DuplicateName = 51,             // Duplicate name.
+    FailedToSave = 52,              // Failed to save config file.
+    CannotFindTable = 53,           // Can not find table by name.
+
+    // task
+    CannotFindTask = 60,            // Can not find task by name.
+    CannotFindFile = 61,            // Can not find the upload file.
+    FailedToVerifyMd5 = 62,         // Failed to verify the upload file md5.
+    CannotExtractZip = 63,          // Can not extract the zip file.
+    CannotCopyApp = 64,             // Can not copy the app file.
+    CycleInvalid = 65,              // Cycle interval is invalid.
+    TimeInvalid = 66,               // Time interval is invalid.
+    RepeatInvalid = 67,             // Repeat type is invalid.
+    CannotFindTaskType = 68,        // Can not find task type.
+
+    // web
+    CannotFindWWWBundlePath = 81,   // Can not find www bundle path.
+    NotAZipFile = 82,               // The uploaded file is not a zip file.
+
+    // exchange
+    CannotFindExchangeType = 90,    // Can not find exchange type.
+    ExchangeTypeInvalid = 91,       // The current type is invalid.
+
+    // catalog
+};
+
+class HttpRegisters {
 public:
-    enum Code {
-        Success = 0,
-        JsonParseError = 1,
-        Unknown = 9
-    };
-
-    class Item {
-    public:
-        int code;
-        String msg;
-
-        Item() = default;
-    };
-
-    ~HttpCode() = default;
-
-    void registerCode(int code, const String &msg);
-
-    void registerCode(std::initializer_list<Item> list);
-
-    String getMessage(int code) const;
-
-    StringMap at(int code) const;
-
-private:
-    HttpCode();
-
-    DECLARE_SINGLETON_CLASS(HttpCode);
-
-public:
-    static HttpCode *instance();
-
-private:
-    Dictionary<int, String> _codes;
+    static void registerCodes() {
+        HttpCode::registerCode({
+                                       {CannotFindLabel,        "Can not find label by name."},
+                                       {DuplicateName,          "Duplicate name."},
+                                       {FailedToSave,           "Failed to save config file."},
+                                       {CannotFindTable,        "Can not find table by name."},
+                                       {CannotFindTask,         "Can not find task by name."},
+                                       {CannotFindFile,         "Can not find the upload file."},
+                                       {FailedToVerifyMd5,      "Failed to verify the upload file md5."},
+                                       {CannotExtractZip,       "Can not extract the zip file."},
+                                       {CannotCopyApp,          "Can not copy the app file."},
+                                       {CycleInvalid,           "Cycle interval is invalid."},
+                                       {TimeInvalid,            "Time interval is invalid."},
+                                       {RepeatInvalid,          "Repeat type is invalid."},
+                                       {CannotFindTaskType,     "Can not find task type."},
+                                       {CannotFindExchangeType, "Can not find exchange type."},
+                                       {ExchangeTypeInvalid,    "The current type is invalid."},
+                               });
+    }
 };
 
 #endif //TSERVER_DATACONTEXT_H

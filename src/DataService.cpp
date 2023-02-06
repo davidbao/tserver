@@ -18,12 +18,7 @@ DataService::DataService() : _provider(nullptr) {
     assert(factory);
     factory->addService<DataService>(this);
 
-    // register codes.
-    HttpCode *hc = HttpCode::instance();
-    hc->registerCode({
-                             {40, "Can not find exchange type."},
-                             {41, "The current type is invalid."}
-                     });
+    HttpRegisters::registerCodes();
 }
 
 DataService::~DataService() {
@@ -179,7 +174,7 @@ bool DataService::getType(const StringMap &request, StringMap &response) {
         return true;
     }
     // The current type is invalid.
-    response.addRange(HttpCode::instance()->at(41));
+    response.addRange(HttpCode::at(ExchangeTypeInvalid));
     return false;
 }
 
@@ -196,7 +191,7 @@ bool DataService::setType(const StringMap &request, StringMap &response) {
         properties.add("summer.exchange.type", type);
         if (!cs->updateConfigFile(properties)) {
             // Failed to save config file.
-            response.addRange(HttpCode::instance()->at(12));
+            response.addRange(HttpCode::at(FailedToSave));
             return false;
         }
 
@@ -213,12 +208,11 @@ bool DataService::setType(const StringMap &request, StringMap &response) {
             _provider = provider;
         }
 
-        response["code"] = "0";
-        response["msg"] = String::Empty;
+        response.addRange(HttpCode::okCode());
         return true;
     } else {
         // Can not find exchange type.
-        response.addRange(HttpCode::instance()->at(40));
+        response.addRange(HttpCode::at(CannotFindExchangeType));
     }
 
     return false;

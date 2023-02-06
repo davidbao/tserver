@@ -249,20 +249,6 @@ TaskService::TaskService() : _timer(nullptr) {
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
     factory->addService<TaskService>(this);
-
-    // register codes.
-    HttpCode *hc = HttpCode::instance();
-    hc->registerCode({
-                             {20, "Can not find task by name."},
-                             {21, "Can not find the upload file."},
-                             {22, "Failed to verify the upload file md5."},
-                             {23, "Can not extract the zip file."},
-                             {24, "Can not copy the app file."},
-                             {25, "Cycle interval is invalid."},
-                             {26, "Time interval is invalid."},
-                             {27, "Repeat type is invalid."},
-                             {28, "Can not find task type."}
-                     });
 }
 
 TaskService::~TaskService() {
@@ -430,7 +416,7 @@ bool TaskService::getTask(const StringMap &request, StringMap &response) {
     }
 
     // Can not find task by name.
-    response.addRange(HttpCode::instance()->at(20));
+    response.addRange(HttpCode::at(CannotFindTask));
     return false;
 }
 
@@ -441,7 +427,7 @@ bool TaskService::addTask(const StringMap &request, StringMap &response) {
         const Task *task = _tasks[i];
         if (task->name == name) {
             // Duplicate name.
-            response.addRange(HttpCode::instance()->at(11));
+            response.addRange(HttpCode::at(DuplicateName));
             return false;
         }
     }
@@ -468,7 +454,7 @@ bool TaskService::addTaskApp(const StringMap &request, StringMap &response) {
         }
         if (!found) {
             // Can not find task by name.
-            response.addRange(HttpCode::instance()->at(20));
+            response.addRange(HttpCode::at(CannotFindTask));
             return false;
         }
     }
@@ -476,7 +462,7 @@ bool TaskService::addTaskApp(const StringMap &request, StringMap &response) {
     // file exist?
     if (!File::exists(fullFileName)) {
         // Can not find the upload file.
-        response.addRange(HttpCode::instance()->at(21));
+        response.addRange(HttpCode::at(CannotFindFile));
         return false;
     }
 
@@ -486,7 +472,7 @@ bool TaskService::addTaskApp(const StringMap &request, StringMap &response) {
         if (Md5Provider::computeFileHash(fullFileName, actual)) {
             if (!String::equals(actual, md5, true)) {
                 // Failed to verify the upload file md5.
-                response.addRange(HttpCode::instance()->at(22));
+                response.addRange(HttpCode::at(FailedToVerifyMd5));
                 return false;
             }
         }
@@ -506,7 +492,7 @@ bool TaskService::addTaskApp(const StringMap &request, StringMap &response) {
                 Directory::deleteDirectory(path);
             }
             // Can not extract the zip file.
-            response.addRange(HttpCode::instance()->at(23));
+            response.addRange(HttpCode::at(CannotExtractZip));
             return false;
         }
     } else {
@@ -517,7 +503,7 @@ bool TaskService::addTaskApp(const StringMap &request, StringMap &response) {
                 Directory::deleteDirectory(path);
             }
             // Can not copy the app file.
-            response.addRange(HttpCode::instance()->at(24));
+            response.addRange(HttpCode::at(CannotCopyApp));
             return false;
         }
     }
@@ -531,8 +517,7 @@ bool TaskService::addTaskApp(const StringMap &request, StringMap &response) {
     }
 #endif
 
-    response["code"] = "0";
-    response["msg"] = String::Empty;
+    response.addRange(HttpCode::okCode());
     return true;
 }
 
@@ -557,7 +542,7 @@ bool TaskService::removeTask(const StringMap &request, StringMap &response) {
     }
     if (!found) {
         // Can not find task by name.
-        response.addRange(HttpCode::instance()->at(20));
+        response.addRange(HttpCode::at(CannotFindTask));
         return false;
     }
 
@@ -573,7 +558,7 @@ bool TaskService::removeTask(const StringMap &request, StringMap &response) {
     }
     if (!cs->updateConfigFile(properties)) {
         // Failed to save config file.
-        response.addRange(HttpCode::instance()->at(12));
+        response.addRange(HttpCode::at(FailedToSave));
         return false;
     }
 
@@ -586,8 +571,7 @@ bool TaskService::removeTask(const StringMap &request, StringMap &response) {
         }
     }
 
-    response["code"] = "0";
-    response["msg"] = String::Empty;
+    response.addRange(HttpCode::okCode());
     return true;
 }
 
@@ -606,7 +590,7 @@ bool TaskService::updateTask(const StringMap &request, StringMap &response) {
     }
     if (!found) {
         // Can not find task by name.
-        response.addRange(HttpCode::instance()->at(20));
+        response.addRange(HttpCode::at(CannotFindTask));
         return false;
     }
     return addOrUpdateTask(request, response, position);
@@ -628,19 +612,19 @@ bool TaskService::addOrUpdateTask(const StringMap &request, StringMap &response,
             task = t;
         } else {
             // Cycle interval is invalid.
-            response.addRange(HttpCode::instance()->at(25));
+            response.addRange(HttpCode::at(CycleInvalid));
             return false;
         }
     } else if (type == "time") {
         DateTime time;
         if (!(DateTime::parse(request["time"], time) && time != DateTime::MinValue)) {
             // Time interval is invalid.
-            response.addRange(HttpCode::instance()->at(26));
+            response.addRange(HttpCode::at(TimeInvalid));
             return false;
         }
         if (!TimeTask::allRepeatTypes().contains(request["repeatType"], true)) {
             // Repeat type is invalid.
-            response.addRange(HttpCode::instance()->at(27));
+            response.addRange(HttpCode::at(RepeatInvalid));
             return false;
         }
 
@@ -654,7 +638,7 @@ bool TaskService::addOrUpdateTask(const StringMap &request, StringMap &response,
         task = t;
     } else {
         // Can not find task type.
-        response.addRange(HttpCode::instance()->at(28));
+        response.addRange(HttpCode::at(CannotFindTaskType));
         return false;
     }
 
@@ -670,7 +654,7 @@ bool TaskService::addOrUpdateTask(const StringMap &request, StringMap &response,
         if (!cs->updateConfigFile(properties)) {
             delete task;    // Don't forget it.
             // Failed to save config file.
-            response.addRange(HttpCode::instance()->at(12));
+            response.addRange(HttpCode::at(FailedToSave));
             return false;
         }
 
@@ -693,8 +677,7 @@ bool TaskService::addOrUpdateTask(const StringMap &request, StringMap &response,
         response["needUploadApp"] = Boolean(needUploadApp).toString();
     }
 
-    response["code"] = "0";
-    response["msg"] = String::Empty;
+    response.addRange(HttpCode::okCode());
     return true;
 }
 

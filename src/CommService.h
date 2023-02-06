@@ -23,8 +23,14 @@ public:
 
     bool unInitialize() override;
 
+public:
+    static String getBundlePath();
+
 private:
     HttpStatus onExchange(const HttpRequest& request, HttpResponse& response);
+
+private:
+    static constexpr const char *www_bundle_str = "www.bundle";
 };
 
 

@@ -30,7 +30,11 @@ private:
     HttpStatus onSetExchangeType(const HttpRequest &request, HttpResponse &response);
 
     // web
-    HttpStatus onUploadWebBundle(const HttpRequest &request, HttpResponse &response);
+    HttpStatus onWebStatus(const HttpRequest &request, HttpResponse &response);
+
+    HttpStatus onUploadBundle(const HttpRequest &request, HttpResponse &response);
+
+    HttpStatus onEnableBundle(const HttpRequest &request, HttpResponse &response);
 
     // database
     HttpStatus onModifyDatabase(const HttpRequest &request, HttpResponse &response);
@@ -71,11 +75,21 @@ private:
     HttpStatus onUpdateTable(const HttpRequest &request, HttpResponse &response);
 
 private:
+    static String getBundlePath();
+
     typedef bool (*Method)(const StringMap &, StringMap &);
 
-    HttpStatus onAction(const HttpRequest &request, HttpResponse &response, Method method);
+    static HttpStatus onAction(const HttpRequest &request, HttpResponse &response, Method method);
 
-    bool uploadWebBundle(const StringMap &request, StringMap &response);
+    static bool uploadWebBundle(const StringMap &request, StringMap &response);
+
+    static bool getWebStatus(const StringMap &request, StringMap &response);
+
+    static bool enableBundle(const StringMap &request, StringMap &response);
+
+private:
+    static constexpr const char *admin_bundle_str = "admin.bundle";
+    static constexpr const char *admin_str = "admin";
 };
 
 

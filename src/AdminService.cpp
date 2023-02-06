@@ -15,6 +15,7 @@
 #include "TaskService.h"
 #include "SimulatorService.h"
 #include "DataService.h"
+#include "CommService.h"
 
 using namespace Crypto;
 
@@ -38,8 +39,12 @@ bool AdminService::initialize() {
 
     // web
 #define WebPath BasePath "/web"
+    hs->registerMapping(HttpMethod::Get, WebPath "/status",
+                        HttpCallback<AdminService>(this, &AdminService::onWebStatus));
     hs->registerMapping(HttpMethod::Put, WebPath "/bundle",
-                        HttpCallback<AdminService>(this, &AdminService::onUploadWebBundle));
+                        HttpCallback<AdminService>(this, &AdminService::onUploadBundle));
+    hs->registerMapping(HttpMethod::Post, WebPath "/bundle/enable",
+                        HttpCallback<AdminService>(this, &AdminService::onEnableBundle));
 
     // database
 #define DatabasePath BasePath "/db"
@@ -86,26 +91,11 @@ bool AdminService::initialize() {
     hs->registerMapping(HttpMethod::Post, SimulatorPath "/table",
                         HttpCallback<AdminService>(this, &AdminService::onUpdateTable));
 
-    // register web server.
-    static const char *admin_bundle_str = "admin.bundle";
-    static const char *admin_str = "admin";
-    String bundlePath;
-    const String appPath = Path::getAppPath();
-    bundlePath = Path::combine(appPath, admin_bundle_str);
+    // register web server
+    String bundlePath = getBundlePath();
     if (Directory::exists(bundlePath)) {
         hs->registerWebPath(admin_str, bundlePath);
-    } else {
-        Application *app = Application::instance();
-        assert(app);
-        bundlePath = Path::combine(app->rootPath(), admin_bundle_str);
-        if (Directory::exists(bundlePath)) {
-            hs->registerWebPath(admin_str, bundlePath);
-        }
     }
-
-//    auto *cs = factory->getService<IConfigService>();
-//    assert(cs);
-//    cs->printProperties();
 
     return true;
 }
@@ -119,6 +109,19 @@ bool AdminService::unInitialize() {
     hs->removeMapping(this);
 
     return true;
+}
+
+String AdminService::getBundlePath() {
+    String path;
+    const String appPath = Path::getAppPath();
+    path = Path::combine(appPath, admin_bundle_str);
+    if (Directory::exists(path)) {
+    } else {
+        Application *app = Application::instance();
+        assert(app);
+        path = Path::combine(app->rootPath(), admin_bundle_str);
+    }
+    return path;
 }
 
 HttpStatus AdminService::onGetExchangeType(const HttpRequest &request, HttpResponse &response) {
@@ -165,7 +168,15 @@ HttpStatus AdminService::onModifyDatabase(const HttpRequest &request, HttpRespon
     return HttpStatus::HttpOk;
 }
 
-HttpStatus AdminService::onUploadWebBundle(const HttpRequest &request, HttpResponse &response) {
+HttpStatus AdminService::onWebStatus(const HttpRequest &request, HttpResponse &response) {
+    StringMap tRequest, tResponse;
+    auto method = [](const StringMap &tRequest, StringMap &tResponse) {
+        return getWebStatus(tRequest, tResponse);
+    };
+    return onAction(request, response, method);
+}
+
+HttpStatus AdminService::onUploadBundle(const HttpRequest &request, HttpResponse &response) {
     JsonNode result;
     StringMap tRequest, tResponse;
     tRequest.add("md5", request.getPropValue("md5"));
@@ -175,13 +186,22 @@ HttpStatus AdminService::onUploadWebBundle(const HttpRequest &request, HttpRespo
     tRequest.add("fullFileName", fullFileName);
 
     uploadWebBundle(tRequest, tResponse);
-    int code = HttpCode::Unknown;   // unknown code.
+
+    int code = HttpCode::Ok;
     Int32::parse(tResponse["code"], code);
     result.add(JsonNode("code", code));
     result.add(JsonNode("msg", tResponse["msg"]));
 
     response.setContent(result);
     return HttpStatus::HttpOk;
+}
+
+HttpStatus AdminService::onEnableBundle(const HttpRequest &request, HttpResponse &response) {
+    StringMap tRequest, tResponse;
+    auto method = [](const StringMap &tRequest, StringMap &tResponse) {
+        return enableBundle(tRequest, tResponse);
+    };
+    return onAction(request, response, method);
 }
 
 bool AdminService::onGetTaskList(const HttpRequest &request, const SqlSelectFilter &filter, DataTable &table) {
@@ -233,7 +253,8 @@ HttpStatus AdminService::onAddTaskApp(const HttpRequest &request, HttpResponse &
     assert(ss);
 
     ss->addTaskApp(tRequest, tResponse);
-    int code = HttpCode::Unknown;   // unknown code.
+
+    int code = HttpCode::Ok;
     Int32::parse(tResponse["code"], code);
     result.add(JsonNode("code", code));
     result.add(JsonNode("msg", tResponse["msg"]));
@@ -394,9 +415,10 @@ HttpStatus AdminService::onAction(const HttpRequest &request, HttpResponse &resp
             method(tRequest, tResponse);
         } else {
             // Json string parse error.
-            tResponse.addRange(HttpCode::instance()->at(HttpCode::JsonParseError));
+            tResponse.addRange(HttpCode::at(HttpCode::JsonParseError));
         }
-        int code = HttpCode::Unknown;   // unknown code.
+
+        int code = HttpCode::Ok;
         Int32::parse(tResponse["code"], code);
         result.add(JsonNode("code", code));
         if (tResponse.contains("msg")) {
@@ -419,8 +441,7 @@ bool AdminService::uploadWebBundle(const StringMap &request, StringMap &response
 
     // file exist?
     if (!File::exists(fullFileName)) {
-        response["code"] = Int32(538).toString();
-        response["msg"] = "Can not find the upload file.";
+        response.addRange(HttpCode::at(CannotFindFile));
         return false;
     }
 
@@ -429,46 +450,88 @@ bool AdminService::uploadWebBundle(const StringMap &request, StringMap &response
         String actual;
         if (Md5Provider::computeFileHash(fullFileName, actual)) {
             if (!String::equals(actual, md5, true)) {
-                response["code"] = Int32(539).toString();
-                response["msg"] = "Failed to verify md5.";
+                response.addRange(HttpCode::at(FailedToVerifyMd5));
                 return false;
             }
         }
     }
 
     // extract files.
-    static const char *admin_bundle_str = "www.bundle";
-    String bundlePath;
-    const String appPath = Path::getAppPath();
-    bundlePath = Path::combine(appPath, admin_bundle_str);
-    if (Directory::exists(bundlePath)) {
-    } else {
-        Application *app = Application::instance();
-        assert(app);
-        bundlePath = Path::combine(app->rootPath(), admin_bundle_str);
-        if (!Directory::exists(bundlePath)) {
-            response["code"] = Int32(550).toString();
-            response["msg"] = "Can not find www.bundle path.";
-            return false;
-        }
+    String bundlePath = CommService::getBundlePath();
+    if (!Directory::exists(bundlePath)) {
+        response.addRange(HttpCode::at(CannotFindWWWBundlePath));
+        return false;
     }
 
     // extract or copy app, check zip first.
     Zip zip(fullFileName);
     if (zip.isValid()) {
         if (!Zip::extract(fullFileName, bundlePath)) {
-            response["code"] = Int32(540).toString();
-            response["msg"] = "Can not extract the zip file.";
+            response.addRange(HttpCode::at(CannotExtractZip));
             return false;
         }
     } else {
         // not a zip file.
-        response["code"] = Int32(551).toString();
-        response["msg"] = "The uploaded file is not a zip file.";
+        response.addRange(HttpCode::at(NotAZipFile));
         return false;
     }
 
-    response["code"] = "0";
-    response["msg"] = String::Empty;
+    response.addRange(HttpCode::okCode());
     return true;
+}
+
+bool AdminService::getWebStatus(const StringMap &request, StringMap &response) {
+    ServiceFactory *factory = ServiceFactory::instance();
+    assert(factory);
+    auto *cs = factory->getService<IConfigService>();
+    assert(cs);
+    bool enable = true;
+    cs->getProperty("summer.web.enable", enable);
+    int port = 0;
+    cs->getProperty("server.port", port);
+    JsonNode node;
+    node.add(JsonNode("enable", enable));
+    node.add(JsonNode("scheme", cs->getProperty("server.scheme")));
+    node.add(JsonNode("port", port));
+
+    response["code"] = "0";
+    response["data"] = node.toString();
+    return true;
+}
+
+bool AdminService::enableBundle(const StringMap &request, StringMap &response) {
+    bool enable;
+    if (Boolean::parse(request["enable"], enable)) {
+        ServiceFactory *factory = ServiceFactory::instance();
+        assert(factory);
+        auto *hs = factory->getService<IHttpRegister>();
+        assert(hs);
+        auto *cs = factory->getService<IConfigService>();
+        assert(cs);
+
+        // unregister web server.
+        String bundlePath = CommService::getBundlePath();
+        if (Directory::exists(bundlePath)) {
+            if (enable) {
+                hs->registerWebPath(bundlePath);
+            } else {
+                hs->unregisterWebPath(bundlePath);
+            }
+        }
+
+        // update profile yml file.
+        YmlNode::Properties properties;
+        properties.add("summer.web.enable", enable);
+        if (!cs->updateConfigFile(properties)) {
+            // Failed to save config file.
+            response.addRange(HttpCode::at(FailedToSave));
+            return false;
+        }
+
+        response.addRange(HttpCode::okCode());
+        return true;
+    } else {
+        response.addRange(HttpCode::at(HttpCode::ParameterIncorrect));
+        return false;
+    }
 }
