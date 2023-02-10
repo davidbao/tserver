@@ -96,8 +96,10 @@ FetchResult DataService::getLabelValues(const JsonNode &request, JsonNode &respo
                 String name = node.getAttribute("name");
                 StringArray tags;
                 node.getAttribute("tags", tags);
+                SqlSelectFilter filter(1, 1);
+                SqlSelectFilter::parse(node["condition"].toString(), filter);
                 StringMap values;
-                FetchResult result = provider->getLabelValues(name, tags, values);
+                FetchResult result = provider->getLabelValues(name, tags, filter, values);
                 JsonNode iNode("item");
                 iNode.add(JsonNode("name", name));
                 iNode.add(JsonNode("errorCode", (int) result));
@@ -111,12 +113,11 @@ FetchResult DataService::getLabelValues(const JsonNode &request, JsonNode &respo
 
             return FetchResult::Succeed;
         } else {
-            // It's not contains tags.
-            return FetchResult::JsonError;
+            // Without labels.
+            return FetchResult::NodeNotFound;
         }
     }
-
-    return FetchResult::JsonError;
+    return FetchResult::NodeNotFound;
 }
 
 FetchResult DataService::getTableValues(const JsonNode &request, JsonNode &response) {
@@ -133,10 +134,12 @@ FetchResult DataService::getTableValues(const JsonNode &request, JsonNode &respo
             for (size_t i = 0; i < nodes.count(); ++i) {
                 const JsonNode &node = nodes[i];
                 String name = node.getAttribute("name");
+                StringArray columns;
+                node.getAttribute("columns", columns);
                 SqlSelectFilter filter;
                 if (SqlSelectFilter::parse(node["condition"].toString(), filter)) {
                     DataTable table("rows");
-                    FetchResult result = provider->getTableValues(name, filter, table);
+                    FetchResult result = provider->getTableValues(name, columns, filter, table);
                     JsonNode iNode("item");
                     iNode.add(JsonNode("name", name));
                     iNode.add(JsonNode("errorCode", (int) result));
@@ -159,10 +162,12 @@ FetchResult DataService::getTableValues(const JsonNode &request, JsonNode &respo
             response = tNode;
 
             return FetchResult::Succeed;
+        } else {
+            // Without tables.
+            return FetchResult::NodeNotFound;
         }
     }
-
-    return FetchResult::JsonError;
+    return FetchResult::NodeNotFound;
 }
 
 bool DataService::getType(const StringMap &request, StringMap &response) {

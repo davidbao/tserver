@@ -120,31 +120,25 @@ HttpStatus CommService::onExchange(const HttpRequest &request, HttpResponse &res
 
         JsonNode dataNode("data");
 
+        // process label node.
         JsonNode labelNode;
         FetchResult lResult = ds->getLabelValues(root["label"], labelNode);
         if (lResult == FetchResult::Succeed) {
             dataNode.add(labelNode);
+        }
 
-            // process table node.
-            JsonNode tableNode;
-            FetchResult tResult = ds->getTableValues(root["table"], tableNode);
-            if (tResult == FetchResult::Succeed) {
-                dataNode.add(tableNode);
-                result.add(JsonNode("code", 0));
-                result.add(dataNode);
-            } else if (tResult == FetchResult::JsonError) {
-                result.addRange(HttpCode::at(HttpCode::JsonParseError));
-            } else if (tResult == FetchResult::ConfigError) {
-                result.addRange(HttpCode::at(CannotFindExchangeType));
-            } else {
-                result.addRange(HttpCode::at(HttpCode::Unknown));
-            }
-        } else if (lResult == FetchResult::JsonError) {
+        // process table node.
+        JsonNode tableNode;
+        FetchResult tResult = ds->getTableValues(root["table"], tableNode);
+        if (tResult == FetchResult::Succeed) {
+            dataNode.add(tableNode);
+        }
+
+        if (lResult == FetchResult::NodeNotFound && tResult == FetchResult::NodeNotFound) {
             result.addRange(HttpCode::at(HttpCode::JsonParseError));
-        } else if (lResult == FetchResult::ConfigError) {
-            result.addRange(HttpCode::at(CannotFindExchangeType));
         } else {
-            result.addRange(HttpCode::at(HttpCode::Unknown));
+            result.add(JsonNode("code", (int) HttpCode::Ok));
+            result.add(dataNode);
         }
     } else {
         result.addRange(HttpCode::at(HttpCode::JsonParseError));

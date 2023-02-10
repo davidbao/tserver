@@ -22,9 +22,11 @@ public:
 
     ~StorageService() override;
 
-    FetchResult getLabelValues(const String &labelName, const StringArray &tagNames, StringMap &values) override;
+    FetchResult getLabelValues(const String &labelName, const StringArray &tagNames,
+                               const SqlSelectFilter &filter, StringMap &values) override;
 
-    FetchResult getTableValues(const String &tableName, const SqlSelectFilter &filter, DataTable &table) override;
+    FetchResult getTableValues(const String &tableName, const StringArray &columns,
+                               const SqlSelectFilter &filter, DataTable &table) override;
 
 private:
     DbClient *dbClient() const;

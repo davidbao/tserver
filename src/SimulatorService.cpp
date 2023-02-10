@@ -142,6 +142,33 @@ void SimulatorService::Tag::runOnce(const Label *label) {
     }
 }
 
+String SimulatorService::Tag::getValue(const SqlSelectFilter &filter) const {
+    if (String::equals(registerStr, "array", true)) {
+        StringArray texts;
+        StringArray::parse(style, texts, ';');
+        if (texts.count() > 0) {
+            const StringMap &values = filter.values();
+            for (auto it = values.begin(); it != values.end(); ++it) {
+                const String &k = it.key();
+                const String &v = it.value();
+
+                // equals
+                if (k == name) {
+                    for (size_t i = 0; i < texts.count(); i++) {
+                        const String text = texts[i].trim();
+                        if (text == v) {
+                            return v;
+                        }
+                    }
+                }
+            }
+        }
+        return String::Empty;
+    } else {
+        return value.toString();
+    }
+}
+
 bool SimulatorService::Tag::parseDoubleStyle(const String &style, double &minValue, double &maxValue, double &step) {
     if (style.isNullOrEmpty()) {
         return false;
@@ -476,6 +503,18 @@ String SimulatorService::Column::getValue(const Table *table, const SqlSelectFil
     } else if (String::equals(registerStr, "array", true)) {
         StringArray texts;
         StringArray::parse(style, texts, ';');
+        if (!filter.orderBy().isNullOrEmpty()) {
+            StringArray orders;
+            StringArray::parse(filter.orderBy(), orders, ' ');
+            if (orders.count() == 2 && String::equals(orders[0].trim(), name, true)) {
+                String order = orders[1].trim();
+                if (String::equals(order, "asc", true)) {
+                    texts.sort(true);
+                } else if (String::equals(order, "desc", true)) {
+                    texts.sort(false);
+                }
+            }
+        }
         if (row < texts.count()) {
             result = String::trim(texts[row], '\'', '"', ' ');
         }
@@ -692,7 +731,8 @@ SimulatorService::~SimulatorService() {
     factory->removeService<SimulatorService>();
 }
 
-FetchResult SimulatorService::getLabelValues(const String &labelName, const StringArray &tagNames, StringMap &values) {
+FetchResult SimulatorService::getLabelValues(const String &labelName, const StringArray &tagNames,
+                                             const SqlSelectFilter &filter, StringMap &values) {
     Locker locker(&_labels);
     for (size_t i = 0; i < _labels.count(); i++) {
         const Label &label = _labels[i];
@@ -700,7 +740,7 @@ FetchResult SimulatorService::getLabelValues(const String &labelName, const Stri
             for (size_t j = 0; j < label.tags.count(); j++) {
                 const Tag &tag = label.tags[j];
                 if (tagNames.contains(tag.name)) {
-                    values.add(tag.name, tag.value);
+                    values.add(tag.name, tag.getValue(filter));
                 }
             }
             return FetchResult::Succeed;
@@ -710,7 +750,8 @@ FetchResult SimulatorService::getLabelValues(const String &labelName, const Stri
 }
 
 FetchResult
-SimulatorService::getTableValues(const String &tableName, const SqlSelectFilter &filter, DataTable &dataTable) {
+SimulatorService::getTableValues(const String &tableName, const StringArray &columns,
+                                 const SqlSelectFilter &filter, DataTable &dataTable) {
     Locker locker(&_tables);
     for (size_t i = 0; i < _tables.count(); i++) {
         const Table &table = _tables[i];

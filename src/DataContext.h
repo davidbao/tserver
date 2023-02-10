@@ -24,7 +24,9 @@ enum FetchResult {
     ConfigError = 1,
     ExecFailed = 2,
     RowCountError = 3,
-    JsonError = 4
+    JsonError = 4,
+    NodeNotFound = 5,
+    DbError = 6
 };
 
 class IDataProvider {
@@ -33,9 +35,11 @@ public:
 
     virtual ~IDataProvider() = default;
 
-    virtual FetchResult getLabelValues(const String &labelName, const StringArray &tagNames, StringMap &values) = 0;
+    virtual FetchResult getLabelValues(const String &labelName, const StringArray &tagNames,
+                                       const SqlSelectFilter &filter, StringMap &values) = 0;
 
-    virtual FetchResult getTableValues(const String &tableName, const SqlSelectFilter &filter, DataTable &table) = 0;
+    virtual FetchResult getTableValues(const String &tableName, const StringArray &columns,
+                                       const SqlSelectFilter &filter, DataTable &table) = 0;
 };
 
 enum HttpErrorCode {

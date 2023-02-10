@@ -38,6 +38,8 @@ public:
 
         void runOnce(const Label *label);
 
+        String getValue(const SqlSelectFilter &filter) const;
+
     private:
         static bool parseDoubleStyle(const String &style, double &minValue, double &maxValue, double &step);
 
@@ -160,9 +162,11 @@ public:
 
     ~SimulatorService() override;
 
-    FetchResult getLabelValues(const String &labelName, const StringArray &tagNames, StringMap &values) override;
+    FetchResult getLabelValues(const String &labelName, const StringArray &tagNames,
+                               const SqlSelectFilter &filter, StringMap &values) override;
 
-    FetchResult getTableValues(const String &tableName, const SqlSelectFilter &filter, DataTable &dataTable) override;
+    FetchResult getTableValues(const String &tableName, const StringArray &columns,
+                               const SqlSelectFilter &filter, DataTable &dataTable) override;
 
     // Labels
     bool getLabels(const SqlSelectFilter &filter, DataTable &table);

@@ -40,17 +40,19 @@ void StorageService::createSqlFile(const String &fileName, const String &sql) {
     return ds->createSqlFile(fileName, sql);
 }
 
-FetchResult StorageService::getLabelValues(const String &labelName, const StringArray &tagNames, StringMap &values) {
+FetchResult StorageService::getLabelValues(const String &labelName, const StringArray &tagNames,
+                                           const SqlSelectFilter &filter, StringMap &values) {
     DbClient *dbClient = this->dbClient();
     if (dbClient == nullptr)
-        return FetchResult::ConfigError;
+        return FetchResult::DbError;
 
     String sql;
     sql = getSql(labelName, 0);
     if (sql.isNullOrEmpty()) {
         String prefix = getTablePrefix();
         String name = prefix.isNullOrEmpty() ? labelName : String::format("%s.%s", prefix.c_str(), labelName.c_str());
-        sql = String::format("SELECT %s FROM %s limit 1", tagNames.toString(',').c_str(), name.c_str());
+        sql = filter.toSelectSql(name, tagNames.toString(','));
+//        sql = String::format("SELECT %s FROM %s limit 1", tagNames.toString(',').c_str(), name.c_str());
     }
 
 #ifdef DEBUG
@@ -81,10 +83,11 @@ FetchResult StorageService::getLabelValues(const String &labelName, const String
     return FetchResult::ExecFailed;
 }
 
-FetchResult StorageService::getTableValues(const String &tableName, const SqlSelectFilter &filter, DataTable &table) {
+FetchResult StorageService::getTableValues(const String &tableName, const StringArray &columns,
+                                           const SqlSelectFilter &filter, DataTable &table) {
     DbClient *dbClient = this->dbClient();
     if (dbClient == nullptr)
-        return FetchResult::ConfigError;
+        return FetchResult::DbError;
 
     String prefix = getTablePrefix();
     String name = prefix.isNullOrEmpty() ? tableName : String::format("%s.%s", prefix.c_str(), tableName.c_str());
@@ -92,7 +95,7 @@ FetchResult StorageService::getTableValues(const String &tableName, const SqlSel
     String sql;
     sql = getSql(tableName, 1);
     if (sql.isNullOrEmpty()) {
-        sql = filter.toQuerySql(name);
+        sql = filter.toSelectSql(name, columns.toString(','));
     }
 
 #ifdef DEBUG
