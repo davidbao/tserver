@@ -36,6 +36,8 @@ private:
     static String getSqlFileName(const String &name, int sqlIndex);
 
     static String getSql(const String &name, int sqlIndex);
+
+    static String getTablePrefix();
 };
 
 

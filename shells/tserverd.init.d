@@ -2,7 +2,7 @@
 ############################################################
 # Name       :      /etc/rc.d/init.d/tserverd
 # Author     :      Baowei
-# Version    :      1.0
+# Version    :      1.1
 # Description:
 # Notes      :        
 #
@@ -17,7 +17,9 @@
 . /etc/sysconfig/rc
 . $rc_functions
 
-tserverd=/usr/local/tserver/tserverd
+tserver_path=/usr/local/tserver
+tserverd="$tserver_path"/tserverd
+export LD_LIBRARY_PATH="$tserver_path"/lib:$LD_LIBRARY_PATH
 
 case $1 in
   start)

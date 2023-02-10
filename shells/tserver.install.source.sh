@@ -69,54 +69,56 @@ function install() {
   if [ ! -f "$SERVICE_FILE" ];then
     touch $SERVICE_FILE
     echo -e "#!/bin/sh\n\
-  ############################################################\n\
-  # Name       :      /etc/rc.d/init.d/tserverd\n\
-  # Author     :      Baowei\n\
-  # Version    :      1.0\n\
-  # Description:\n\
-  # Notes      :\n\
-  #\n\
-  ############################################################\n\
-  \n\
-  #\n\
-  #\n\
-  # Include the functions declared in the /etc/init.d/functions\n\
-  # and /etc/sysconfig/rc file\n\
-  #\n\
-  \n\
-  . /etc/sysconfig/rc\n\
-  . \$rc_functions\n\
-  \n\
-  tserverd=$TARGET_PATH/tserver/tserverd\n\
-  \n\
-  case \$1 in\n\
-    start)\n\
-    boot_mesg \"Starting tserverd...\"\n\
-    startproc tserver tserver \$tserverd -d\n\
+############################################################\n\
+# Name       :      /etc/rc.d/init.d/tserverd\n\
+# Author     :      Baowei\n\
+# Version    :      1.1\n\
+# Description:\n\
+# Notes      :\n\
+#\n\
+############################################################\n\
+\n\
+#\n\
+#\n\
+# Include the functions declared in the /etc/init.d/functions\n\
+# and /etc/sysconfig/rc file\n\
+#\n\
+\n\
+. /etc/sysconfig/rc\n\
+. \$rc_functions\n\
+\n\
+tserver_path=$TARGET_PATH/tserver\n\
+tserverd=\"\$tserver_path\"/tserverd\n\
+export LD_LIBRARY_PATH=\"\$tserver_path\"/lib:\$LD_LIBRARY_PATH\n\
+\n\
+case \$1 in\n\
+  start)\n\
+  boot_mesg \"Starting tserverd...\"\n\
+  startproc tserver tserver \$tserverd -d\n\
+  ;;\n\
+  stop)\n\
+  boot_mesg \"Stopping tserverd...\"\n\
+  killproc \$tserverd\n\
+  ;;\n\
+  reload)\n\
+  boot_mesg \"Reloading tserverd...\"\n\
+  reloadproc \$tserverd\n\
+  ;;\n\
+  restart)\n\
+  \$0 stop\n\
+  /bin/sleep 1\n\
+  \$0 start\n\
+  ;;\n\
+  status)\n\
+  statusproc \$tserverd\n\
+  ;;\n\
+  *)\n\
+  echo \"Usage: \$0 [start|stop|reload|restart|status]\"\n\
+  exit 1\n\
     ;;\n\
-    stop)\n\
-    boot_mesg \"Stopping tserverd...\"\n\
-    killproc \$tserverd\n\
-    ;;\n\
-    reload)\n\
-    boot_mesg \"Reloading tserverd...\"\n\
-    reloadproc \$tserverd\n\
-    ;;\n\
-    restart)\n\
-    \$0 stop\n\
-    /bin/sleep 1\n\
-    \$0 start\n\
-    ;;\n\
-    status)\n\
-    statusproc \$tserverd\n\
-    ;;\n\
-    *)\n\
-    echo \"Usage: \$0 [start|stop|reload|restart|status]\"\n\
-    exit 1\n\
-      ;;\n\
-  esac\n\
-  \n\
-  # End of file\n\
+esac\n\
+\n\
+# End of file\n\
   " > $SERVICE_FILE
   fi
   chown sys:sys $SERVICE_FILE

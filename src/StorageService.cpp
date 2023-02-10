@@ -48,7 +48,9 @@ FetchResult StorageService::getLabelValues(const String &labelName, const String
     String sql;
     sql = getSql(labelName, 0);
     if (sql.isNullOrEmpty()) {
-        sql = String::format("SELECT %s FROM %s limit 1", tagNames.toString(',').c_str(), labelName.c_str());
+        String prefix = getTablePrefix();
+        String name = prefix.isNullOrEmpty() ? labelName : String::format("%s.%s", prefix.c_str(), labelName.c_str());
+        sql = String::format("SELECT %s FROM %s limit 1", tagNames.toString(',').c_str(), name.c_str());
     }
 
 #ifdef DEBUG
@@ -84,10 +86,13 @@ FetchResult StorageService::getTableValues(const String &tableName, const SqlSel
     if (dbClient == nullptr)
         return FetchResult::ConfigError;
 
+    String prefix = getTablePrefix();
+    String name = prefix.isNullOrEmpty() ? tableName : String::format("%s.%s", prefix.c_str(), tableName.c_str());
+
     String sql;
     sql = getSql(tableName, 1);
     if (sql.isNullOrEmpty()) {
-        sql = filter.toQuerySql(tableName);
+        sql = filter.toQuerySql(name);
     }
 
 #ifdef DEBUG
@@ -97,7 +102,7 @@ FetchResult StorageService::getTableValues(const String &tableName, const SqlSel
     if (dbClient->executeSqlQuery(sql, table)) {
         sql = getSql(tableName, 2);
         if (sql.isNullOrEmpty()) {
-            sql = filter.toCountSql(tableName);
+            sql = filter.toCountSql(name);
         }
 
 #ifdef DEBUG
@@ -176,4 +181,15 @@ String StorageService::getSql(const String &name, int sqlIndex) {
         return sql;
     }
     return String::Empty;
+}
+
+String StorageService::getTablePrefix() {
+    ServiceFactory *factory = ServiceFactory::instance();
+    assert(factory);
+    auto *cs = factory->getService<IConfigService>();
+    assert(cs);
+
+    String prefix;
+    cs->getProperty("summer.exchange.database.table.prefix", prefix);
+    return prefix;
 }

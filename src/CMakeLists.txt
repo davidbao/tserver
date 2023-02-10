@@ -75,6 +75,14 @@ elseif (WEB_OS)
     set(EXTERNALS_LIB ${EXTERNALS_LIB})
 endif ()
 
+if (TSERVER_BUILD_KINGBASE)
+    if (WIN_OS)
+        set(EXTERNALS_LIB kci ${EXTERNALS_LIB})
+    else ()
+        set(EXTERNALS_LIB kci crypto ${EXTERNALS_LIB})
+    endif ()
+endif ()
+
 set(COMMON_LIB common${CMAKE_FIND_LIBRARY_SUFFIXES} ${EXTERNALS_LIB})
 #    message(STATUS "COMMON_LIB: " ${COMMON_LIB})
 

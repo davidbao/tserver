@@ -130,38 +130,24 @@ HttpStatus CommService::onExchange(const HttpRequest &request, HttpResponse &res
             FetchResult tResult = ds->getTableValues(root["table"], tableNode);
             if (tResult == FetchResult::Succeed) {
                 dataNode.add(tableNode);
-                result.add(JsonNode("code", "200"));
+                result.add(JsonNode("code", 0));
                 result.add(dataNode);
             } else if (tResult == FetchResult::JsonError) {
-                // Json string parse error.
-                result.add(JsonNode("code", "511"));
-                result.add(JsonNode("msg", "Json string parse error."));
+                result.addRange(HttpCode::at(HttpCode::JsonParseError));
             } else if (tResult == FetchResult::ConfigError) {
-                // Config error.
-                result.add(JsonNode("code", "512"));
-                result.add(JsonNode("msg", "Config error."));
+                result.addRange(HttpCode::at(CannotFindExchangeType));
             } else {
-                // Unknown error.
-                result.add(JsonNode("code", "513"));
-                result.add(JsonNode("msg", "Unknown error."));
+                result.addRange(HttpCode::at(HttpCode::Unknown));
             }
         } else if (lResult == FetchResult::JsonError) {
-            // Json string parse error.
-            result.add(JsonNode("code", "511"));
-            result.add(JsonNode("msg", "Json string parse error."));
+            result.addRange(HttpCode::at(HttpCode::JsonParseError));
         } else if (lResult == FetchResult::ConfigError) {
-            // Config error.
-            result.add(JsonNode("code", "512"));
-            result.add(JsonNode("msg", "Config error."));
+            result.addRange(HttpCode::at(CannotFindExchangeType));
         } else {
-            // Unknown error.
-            result.add(JsonNode("code", "513"));
-            result.add(JsonNode("msg", "Unknown error."));
+            result.addRange(HttpCode::at(HttpCode::Unknown));
         }
     } else {
-        // Json string parse error.
-        result.add(JsonNode("code", "511"));
-        result.add(JsonNode("msg", "Json string parse error."));
+        result.addRange(HttpCode::at(HttpCode::JsonParseError));
     }
     response.setContent(result);
 

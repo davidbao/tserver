@@ -25,6 +25,7 @@ public:
     public:
         String name;
         String registerStr;
+        String style;
         Variant value;
 
         explicit Tag(const String &registerStr = String::Empty);
@@ -36,6 +37,9 @@ public:
         void evaluates(const Tag &other) override;
 
         void runOnce(const Label *label);
+
+    private:
+        static bool parseDoubleStyle(const String &style, double &minValue, double &maxValue, double &step);
 
     private:
         double _oldValue;
@@ -108,6 +112,9 @@ public:
 
     public:
         static bool parseStyle(const String &str, String &style);
+
+    private:
+        static bool parseDoubleStyle(const String &style, double &minValue, double &maxValue, double &step);
     };
 
     typedef List<Column> Columns;

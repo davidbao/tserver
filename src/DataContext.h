@@ -62,9 +62,7 @@ enum HttpErrorCode {
 
     // exchange
     CannotFindExchangeType = 90,    // Can not find exchange type.
-    ExchangeTypeInvalid = 91,       // The current type is invalid.
-
-    // catalog
+    ExchangeTypeInvalid = 91,       // The current exchange type is invalid.
 };
 
 class HttpRegisters {
@@ -85,7 +83,7 @@ public:
                                        {RepeatInvalid,          "Repeat type is invalid."},
                                        {CannotFindTaskType,     "Can not find task type."},
                                        {CannotFindExchangeType, "Can not find exchange type."},
-                                       {ExchangeTypeInvalid,    "The current type is invalid."},
+                                       {ExchangeTypeInvalid,    "The current exchange type is invalid."},
                                });
     }
 };

@@ -26,27 +26,36 @@ SimulatorService::Tag::Tag(const Tag &tag) : _oldValue(Double::NaN) {
 bool SimulatorService::Tag::equals(const Tag &other) const {
     return this->name == other.name &&
            this->registerStr == other.registerStr &&
+           this->style == other.style &&
            this->value == other.value;
 }
 
 void SimulatorService::Tag::evaluates(const Tag &other) {
     this->name = other.name;
     this->registerStr = other.registerStr;
+    this->style = other.style;
     this->value = other.value;
 }
 
 void SimulatorService::Tag::runOnce(const Label *label) {
+    double minValue, maxValue, step;
+    if (!parseDoubleStyle(style, minValue, maxValue, step)) {
+        minValue = label->minValue;
+        maxValue = label->maxValue;
+        step = label->step;
+    }
+
     if (String::equals(registerStr, "increase", true)) {
         if (value.isNullType()) {
             value = Variant(Variant::Float64);
         }
         if (value.isNullValue()) {
-            value = label->minValue;
+            value = minValue;
         } else {
             double v = value;
-            v += label->step;
-            if (v > label->maxValue) {
-                v = label->minValue;
+            v += step;
+            if (v > maxValue) {
+                v = minValue;
             }
             value = v;
         }
@@ -55,12 +64,12 @@ void SimulatorService::Tag::runOnce(const Label *label) {
             value = Variant(Variant::Float64);
         }
         if (value.isNullValue()) {
-            value = label->maxValue;
+            value = maxValue;
         } else {
             double v = value;
-            v -= label->step;
-            if (v < label->minValue) {
-                v = label->maxValue;
+            v -= step;
+            if (v < minValue) {
+                v = maxValue;
             }
             value = v;
         }
@@ -68,7 +77,7 @@ void SimulatorService::Tag::runOnce(const Label *label) {
         if (value.isNullType()) {
             value = Variant(Variant::Float64);
         }
-        value = Random::getRandValue(label->minValue, label->maxValue);
+        value = Random::getRandValue(minValue, maxValue);
     } else if (String::equals(registerStr, "sin", true)) {
         if (value.isNullType()) {
             value = Variant(Variant::Float64);
@@ -77,16 +86,16 @@ void SimulatorService::Tag::runOnce(const Label *label) {
         if (Double::isNaN(oldValue))
             oldValue = 0.0;
         else
-            oldValue = oldValue + label->step;
+            oldValue = oldValue + step;
         if (oldValue > 360.0)
             oldValue = 0.0;
         _oldValue = oldValue;
-        double scope = label->maxValue - label->minValue + label->step;
-        double v = label->minValue + scope * (Math::sin(oldValue) + 1.0) / 2.0;
-        if (v < label->minValue)
-            v = label->minValue;
-        if (v > label->maxValue)
-            v = label->maxValue;
+        double scope = maxValue - minValue + step;
+        double v = minValue + scope * (Math::sin(oldValue) + 1.0) / 2.0;
+        if (v < minValue)
+            v = minValue;
+        if (v > maxValue)
+            v = maxValue;
         value = v;
     } else if (String::equals(registerStr, "cos", true)) {
         if (value.isNullType()) {
@@ -96,16 +105,16 @@ void SimulatorService::Tag::runOnce(const Label *label) {
         if (Double::isNaN(oldValue))
             oldValue = 0.0;
         else
-            oldValue = oldValue + label->step;
+            oldValue = oldValue + step;
         if (oldValue > 360.0)
             oldValue = 0.0;
         _oldValue = oldValue;
-        double scope = label->maxValue - label->minValue + label->step;
-        double v = label->minValue + scope * (Math::cos(oldValue) + 1.0) / 2.0;
-        if (v < label->minValue)
-            v = label->minValue;
-        if (v > label->maxValue)
-            v = label->maxValue;
+        double scope = maxValue - minValue + step;
+        double v = minValue + scope * (Math::cos(oldValue) + 1.0) / 2.0;
+        if (v < minValue)
+            v = minValue;
+        if (v > maxValue)
+            v = maxValue;
         value = v;
     } else if (String::equals(registerStr, "onoff", true)) {
         if (value.isNullType()) {
@@ -131,6 +140,45 @@ void SimulatorService::Tag::runOnce(const Label *label) {
             value = registerStr;
         }
     }
+}
+
+bool SimulatorService::Tag::parseDoubleStyle(const String &style, double &minValue, double &maxValue, double &step) {
+    if (style.isNullOrEmpty()) {
+        return false;
+    }
+
+    bool result = true;
+    StringArray texts;
+    StringArray::parse(style, texts, ';');
+    for (size_t i = 0; i < texts.count(); ++i) {
+        char nameStr[255] = {0}, valueStr[255] = {0};
+        int rValue = sscanf(texts[i].trim().c_str(), "%[a-z|A-Z|0-9]:%s", nameStr, valueStr);
+        if (rValue >= 2) {
+            String n = String::trim(nameStr, '\'', '"', ' ');
+            String v = String::trim(valueStr, '\'', '"', ' ');
+            if (String::equals(n, "range", true)) {
+                StringArray ranges;
+                StringArray::parse(v, ranges, '-');
+                if (ranges.count() == 2) {
+                    if (!Double::parse(ranges[0], minValue)) {
+                        result = false;
+                    }
+                    if (!Double::parse(ranges[1], maxValue)) {
+                        result = false;
+                    }
+                } else {
+                    result = false;
+                }
+            } else if (String::equals(n, "step", true)) {
+                if (!Double::parse(v, step)) {
+                    result = false;
+                }
+            }
+        } else {
+            result = false;
+        }
+    }
+    return result;
 }
 
 SimulatorService::Label::Label() : minValue(0), maxValue(100), step(1), _tick(0) {
@@ -190,6 +238,7 @@ String SimulatorService::Label::toTagsStr() const {
         JsonNode node;
         node.add(JsonNode("name", tag.name));
         node.add(JsonNode("register", tag.registerStr));
+        node.add(JsonNode("style", tag.style));
         result.add(node);
     }
     return result.toString();
@@ -252,6 +301,7 @@ bool SimulatorService::Label::parseTags(const String &str, Tags &tags) {
             Tag tag;
             tag.name = node.getAttribute("name").trim();
             tag.registerStr = node.getAttribute("register").trim();
+            tag.style = node.getAttribute("style").trim();
             tags.add(tag);
         }
     }
@@ -307,35 +357,67 @@ void SimulatorService::Column::evaluates(const Column &other) {
 String SimulatorService::Column::getValue(const Table *table, const SqlSelectFilter &filter, int row) const {
     String result;
     if (String::equals(registerStr, "increase", true)) {
-        double v = table->minValue;
-        v += table->step * row;
+        double minValue, maxValue, step;
+        if (!parseDoubleStyle(style, minValue, maxValue, step)) {
+            minValue = table->minValue;
+            maxValue = table->maxValue;
+            step = table->step;
+        }
+        int maxValueRowCount = (int) Math::round((maxValue - minValue) / step + 0.5);
+        double v = minValue;
+        v += step * (row % maxValueRowCount);
         result = Double(v).toString();
     } else if (String::equals(registerStr, "decrease", true)) {
-        double v = table->maxValue;
-        v -= table->step * row;
+        double minValue, maxValue, step;
+        if (!parseDoubleStyle(style, minValue, maxValue, step)) {
+            minValue = table->minValue;
+            maxValue = table->maxValue;
+            step = table->step;
+        }
+        int maxValueRowCount = (int) Math::round((maxValue - minValue) / step + 0.5);
+        double v = maxValue;
+        v -= step * (row % maxValueRowCount);
         result = Double(v).toString();
     } else if (String::equals(registerStr, "random", true)) {
-        double v = Random::getRandValue(table->minValue, table->maxValue);
+        double minValue, maxValue, step;
+        if (!parseDoubleStyle(style, minValue, maxValue, step)) {
+            minValue = table->minValue;
+            maxValue = table->maxValue;
+            step = table->step;
+        }
+        double v = Random::getRandValue(minValue, maxValue);
         result = Double(v).toString();
     } else if (String::equals(registerStr, "sin", true)) {
-        double v = table->minValue;
-        v += table->step * row;
-        double scope = table->maxValue - table->minValue + table->step;
-        v = table->minValue + scope * (Math::sin(v) + 1.0) / 2.0;
-        if (v < table->minValue)
-            v = table->minValue;
-        if (v > table->maxValue)
-            v = table->maxValue;
+        double minValue, maxValue, step;
+        if (!parseDoubleStyle(style, minValue, maxValue, step)) {
+            minValue = table->minValue;
+            maxValue = table->maxValue;
+            step = table->step;
+        }
+        double v = minValue;
+        v += step * row;
+        double scope = maxValue - minValue + step;
+        v = minValue + scope * (Math::sin(v) + 1.0) / 2.0;
+        if (v < minValue)
+            v = minValue;
+        if (v > maxValue)
+            v = maxValue;
         result = Double(v).toString();
     } else if (String::equals(registerStr, "cos", true)) {
-        double v = table->minValue;
-        v += table->step * row;
-        double scope = table->maxValue - table->minValue + table->step;
-        v = table->minValue + scope * (Math::cos(v) + 1.0) / 2.0;
-        if (v < table->minValue)
-            v = table->minValue;
-        if (v > table->maxValue)
-            v = table->maxValue;
+        double minValue, maxValue, step;
+        if (!parseDoubleStyle(style, minValue, maxValue, step)) {
+            minValue = table->minValue;
+            maxValue = table->maxValue;
+            step = table->step;
+        }
+        double v = minValue;
+        v += step * row;
+        double scope = maxValue - minValue + step;
+        v = minValue + scope * (Math::cos(v) + 1.0) / 2.0;
+        if (v < minValue)
+            v = minValue;
+        if (v > maxValue)
+            v = maxValue;
         result = Double(v).toString();
     } else if (String::equals(registerStr, "onoff", true)) {
         bool v = (row % 2) == 0;
@@ -423,6 +505,45 @@ bool SimulatorService::Column::parseStyle(const String &str, String &style) {
         style = str;
         return true;
     }
+}
+
+bool SimulatorService::Column::parseDoubleStyle(const String &style, double &minValue, double &maxValue, double &step) {
+    if (style.isNullOrEmpty()) {
+        return false;
+    }
+
+    bool result = true;
+    StringArray texts;
+    StringArray::parse(style, texts, ';');
+    for (size_t i = 0; i < texts.count(); ++i) {
+        char nameStr[255] = {0}, valueStr[255] = {0};
+        int rValue = sscanf(texts[i].trim().c_str(), "%[a-z|A-Z|0-9]:%s", nameStr, valueStr);
+        if (rValue >= 2) {
+            String n = String::trim(nameStr, '\'', '"', ' ');
+            String v = String::trim(valueStr, '\'', '"', ' ');
+            if (String::equals(n, "range", true)) {
+                StringArray ranges;
+                StringArray::parse(v, ranges, '-');
+                if (ranges.count() == 2) {
+                    if (!Double::parse(ranges[0], minValue)) {
+                        result = false;
+                    }
+                    if (!Double::parse(ranges[1], maxValue)) {
+                        result = false;
+                    }
+                } else {
+                    result = false;
+                }
+            } else if (String::equals(n, "step", true)) {
+                if (!Double::parse(v, step)) {
+                    result = false;
+                }
+            }
+        } else {
+            result = false;
+        }
+    }
+    return result;
 }
 
 SimulatorService::Table::Table() : minValue(0), maxValue(100), step(1), rowCount(0) {
@@ -582,10 +703,10 @@ FetchResult SimulatorService::getLabelValues(const String &labelName, const Stri
                     values.add(tag.name, tag.value);
                 }
             }
-            break;
+            return FetchResult::Succeed;
         }
     }
-    return FetchResult::Succeed;
+    return FetchResult::RowCountError;
 }
 
 FetchResult
@@ -617,11 +738,10 @@ SimulatorService::getTableValues(const String &tableName, const SqlSelectFilter 
                 }
                 dataTable.addRow(dataRow);
             }
-            break;
+            return FetchResult::Succeed;
         }
     }
-
-    return FetchResult::Succeed;
+    return FetchResult::RowCountError;
 }
 
 void SimulatorService::initLabels() {
@@ -653,6 +773,7 @@ void SimulatorService::initLabels() {
                     break;
                 }
                 cs->getProperty(String::format(tagPrefix "register", i, j), tag.registerStr);
+                cs->getProperty(String::format(tagPrefix "style", i, j), tag.style);
                 label.tags.add(tag);
             }
             _labels.add(label);
