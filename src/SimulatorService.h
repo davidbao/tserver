@@ -13,11 +13,13 @@
 #include "data/Variant.h"
 #include "thread/Timer.h"
 #include "system/ServiceFactory.h"
+#include "configuration/ConfigService.h"
 
 using namespace Data;
 using namespace System;
+using namespace Config;
 
-class SimulatorService : public IService, public IDataProvider {
+class SimulatorService : public IDataProvider, public IConfigService {
 public:
     class Label;
 
@@ -191,6 +193,14 @@ public:
     bool updateTable(const StringMap &request, StringMap &response);
 
 private:
+    const YmlNode::Properties &properties() const override final;
+
+    bool setProperty(const String &key, const String &value) override final;
+
+    bool updateConfigFile(const YmlNode::Properties &properties) override final;
+
+    bool loadSimulatorData();
+
     void initLabels();
 
     void initTables();
@@ -216,12 +226,12 @@ private:
 
 private:
 #define maxLabelCount 1000
-#define labelPrefix "summer.exchange.simulator.labels[%d]."
+#define labelPrefix "labels[%d]."
 #define maxTagCount 1000
 #define tagPrefix labelPrefix "tags[%d]."
 
 #define maxTableCount 1000
-#define tablePrefix "summer.exchange.simulator.tables[%d]."
+#define tablePrefix "tables[%d]."
 #define maxColumnCount 100
 #define columnPrefix tablePrefix "columns[%d]."
 
@@ -229,6 +239,8 @@ private:
     Timer *_timer;
 
     Tables _tables;
+
+    YmlNode::Properties _properties;
 };
 
 

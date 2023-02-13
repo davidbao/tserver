@@ -46,10 +46,10 @@ bool AdminService::initialize() {
     hs->registerMapping(HttpMethod::Post, WebPath "/bundle/enable",
                         HttpCallback<AdminService>(this, &AdminService::onEnableBundle));
 
-    // database
-#define DatabasePath BasePath "/db"
-    hs->registerMapping(HttpMethod::Post, DatabasePath "/modify",
-                        HttpCallback<AdminService>(this, &AdminService::onModifyDatabase));
+//    // database
+//#define DatabasePath BasePath "/db"
+//    hs->registerMapping(HttpMethod::Post, DatabasePath "/modify",
+//                        HttpCallback<AdminService>(this, &AdminService::onModifyDatabase));
 
     // task
 #define TaskPath BasePath "/tt"

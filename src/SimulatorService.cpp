@@ -11,9 +11,14 @@
 #include "configuration/ConfigService.h"
 #include "thread/TickTimeout.h"
 #include "system/Random.h"
+#include "system/Application.h"
 #include "system/Math.h"
+#include "IO/Path.h"
+#include "IO/Directory.h"
 
 using namespace Config;
+using namespace IO;
+using namespace System;
 
 SimulatorService::Tag::Tag(const String &registerStr) : registerStr(registerStr), value(Variant::Null),
                                                         _oldValue(Double::NaN) {
@@ -707,16 +712,19 @@ SimulatorService::SimulatorService() : _timer(nullptr) {
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
     factory->addService<SimulatorService>(this);
+    factory->addService<IConfigService>("SimulatorService", this);
 
-    // initialize.
     auto *cs = factory->getService<IConfigService>();
     assert(cs);
 
     String type;
     cs->getProperty("summer.exchange.type", type);
     if (String::equals(type, "simulator", true)) {
-        // It's a simulator, so initialize.
+        // It's a simulator, so do initialization.
+        loadSimulatorData();
+
         initLabels();
+
         initTables();
 
         startSimulator();
@@ -729,6 +737,7 @@ SimulatorService::~SimulatorService() {
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
     factory->removeService<SimulatorService>();
+    factory->removeService<IConfigService>("SimulatorService");
 }
 
 FetchResult SimulatorService::getLabelValues(const String &labelName, const StringArray &tagNames,
@@ -749,9 +758,8 @@ FetchResult SimulatorService::getLabelValues(const String &labelName, const Stri
     return FetchResult::RowCountError;
 }
 
-FetchResult
-SimulatorService::getTableValues(const String &tableName, const StringArray &columns,
-                                 const SqlSelectFilter &filter, DataTable &dataTable) {
+FetchResult SimulatorService::getTableValues(const String &tableName, const StringArray &columns,
+                                             const SqlSelectFilter &filter, DataTable &dataTable) {
     Locker locker(&_tables);
     for (size_t i = 0; i < _tables.count(); i++) {
         const Table &table = _tables[i];
@@ -785,13 +793,33 @@ SimulatorService::getTableValues(const String &tableName, const StringArray &col
     return FetchResult::RowCountError;
 }
 
+bool SimulatorService::loadSimulatorData() {
+    ServiceFactory *factory = ServiceFactory::instance();
+    assert(factory);
+    auto *cs = factory->getService<IConfigService>();
+    assert(cs);
+
+    String type;
+    cs->getProperty("summer.exchange.simulator.type", type);
+    if (String::equals(type, "file", true)) {
+        // load yml file.
+        String path = Application::instance()->rootPath();
+        String name = cs->getProperty("summer.exchange.simulator.file.name");
+        String fileName = Path::combine(path, String::format("%s.yml", name.c_str()));
+        return YmlNode::loadFile(fileName, _properties);
+    } else if (String::equals(type, "database", true)) {
+        // todo: load from database.
+    }
+    return false;
+}
+
 void SimulatorService::initLabels() {
     Locker locker(&_labels);
     _labels.clear();
 
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
-    auto *cs = factory->getService<IConfigService>();
+    auto *cs = factory->getService<IConfigService>("SimulatorService");
     assert(cs);
 
     for (int i = 0; i < maxLabelCount; i++) {
@@ -828,7 +856,7 @@ void SimulatorService::initTables() {
 
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
-    auto *cs = factory->getService<IConfigService>();
+    auto *cs = factory->getService<IConfigService>("SimulatorService");
     assert(cs);
 
     for (int i = 0; i < maxTableCount; i++) {
@@ -988,10 +1016,10 @@ bool SimulatorService::removeLabel(const StringMap &request, StringMap &response
         return false;
     }
 
-    // update profile yml file.
+    // update simulator yml file.
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
-    auto *cs = factory->getService<IConfigService>();
+    auto *cs = factory->getService<IConfigService>("SimulatorService");
     assert(cs);
 
     YmlNode::Properties properties;
@@ -1037,10 +1065,10 @@ bool SimulatorService::addOrUpdateLabel(const StringMap &request, StringMap &res
     TimeSpan::parse(request["interval"], label.interval);
     Label::parseTags(request["tags"], label.tags);
 
-    // update profile yml file.
+    // update simulator yml file.
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
-    auto *cs = factory->getService<IConfigService>();
+    auto *cs = factory->getService<IConfigService>("SimulatorService");
     assert(cs);
 
     YmlNode::Properties properties;
@@ -1070,10 +1098,10 @@ bool SimulatorService::addOrUpdateTable(const StringMap &request, StringMap &res
     Int32::parse(request["rowCount"], table.rowCount);
     Table::parseColumns(request["columns"], table.columns);
 
-    // update profile yml file.
+    // update simulator yml file.
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
-    auto *cs = factory->getService<IConfigService>();
+    auto *cs = factory->getService<IConfigService>("SimulatorService");
     assert(cs);
 
     YmlNode::Properties properties;
@@ -1184,10 +1212,10 @@ bool SimulatorService::removeTable(const StringMap &request, StringMap &response
         return false;
     }
 
-    // update profile yml file.
+    // update simulator yml file.
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
-    auto *cs = factory->getService<IConfigService>();
+    auto *cs = factory->getService<IConfigService>("SimulatorService");
     assert(cs);
 
     YmlNode::Properties properties;
@@ -1257,4 +1285,38 @@ void SimulatorService::updateYmlProperties(const Table &table, int position, Yml
 
 void SimulatorService::updateTableYmlProperties(bool enable, int position, YmlNode::Properties &properties) {
     properties.add(String::format(tablePrefix "enable", position), enable);
+}
+
+const YmlNode::Properties &SimulatorService::properties() const {
+    return _properties;
+}
+
+bool SimulatorService::setProperty(const String &key, const String &value) {
+    _properties.add(key, value);
+    return true;
+}
+
+bool SimulatorService::updateConfigFile(const YmlNode::Properties &properties) {
+    ServiceFactory *factory = ServiceFactory::instance();
+    assert(factory);
+    auto *cs = factory->getService<IConfigService>();
+    assert(cs);
+
+    String path = Application::instance()->rootPath();
+    String name = cs->getProperty("summer.exchange.simulator.file.name");
+    String fileName = Path::combine(path, String::format("%s.yml", name.c_str()));
+    bool result = YmlNode::updateFile(fileName, properties);
+    if (result) {
+        // update properties in memory.
+        StringArray keys;
+        properties.keys(keys);
+        for (size_t i = 0; i < keys.count(); i++) {
+            const String &key = keys[i];
+            String value;
+            if (properties.at(key, value)) {
+                _properties.add(key, value);
+            }
+        }
+    }
+    return result;
 }

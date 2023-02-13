@@ -69,6 +69,7 @@ String TaskService::CycleTask::type() const {
 JsonNode TaskService::CycleTask::toJsonNode() const {
     JsonNode node;
     node.add(JsonNode("name", name));
+    node.add(JsonNode("type", type()));
     node.add(JsonNode("app", app));
     node.add(JsonNode("param", param));
     node.add(JsonNode("interval", interval));
@@ -140,6 +141,7 @@ String TaskService::TimeTask::type() const {
 JsonNode TaskService::TimeTask::toJsonNode() const {
     JsonNode node;
     node.add(JsonNode("name", name));
+    node.add(JsonNode("type", type()));
     node.add(JsonNode("app", app));
     node.add(JsonNode("param", param));
     node.add(JsonNode("time", time));
@@ -160,7 +162,8 @@ bool TaskService::TimeTask::parseWeeks(const String &value, Vector<DayOfWeek> &w
             int start, end;
             if (Int32::parse(texts[0], start) &&
                 Int32::parse(texts[1], end) &&
-                start >= 0 && start <= 6 && end >= 0 && end <= 6 &&
+                start >= DayOfWeek::Sunday && start <= DayOfWeek::Saturday &&
+                end >= DayOfWeek::Sunday && end <= DayOfWeek::Saturday &&
                 end >= start) {
                 for (int week = start; week <= end; ++week) {
                     weeks.add((DayOfWeek) week);
@@ -174,7 +177,7 @@ bool TaskService::TimeTask::parseWeeks(const String &value, Vector<DayOfWeek> &w
         for (size_t i = 0; i < texts.count(); ++i) {
             int week;
             if (Int32::parse(texts[i], week) &&
-                week >= 0 && week <= 6) {
+                week >= DayOfWeek::Sunday && week <= DayOfWeek::Saturday) {
                 weeks.add((DayOfWeek) week);
             }
         }
