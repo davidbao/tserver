@@ -1,28 +1,28 @@
 //
-//  CommService.cpp
+//  WebService.cpp
 //  tserver
 //
 //  Created by baowei on 2022/12/16.
-//  Copyright © 2022 com. All rights reserved.
+//  Copyright (c) 2022 com. All rights reserved.
 //
 
-#include "CommService.h"
+#include "WebService.h"
 #include "IO/Path.h"
 #include "IO/Directory.h"
 #include "system/ServiceFactory.h"
 #include "system/Application.h"
 #include "microservice/HttpService.h"
 #include "configuration/ConfigService.h"
-#include "DataService.h"
+#include "ExcService.h"
 
 using namespace Data;
 using namespace Microservice;
 
-CommService::CommService() = default;
+WebService::WebService() = default;
 
-CommService::~CommService() = default;
+WebService::~WebService() = default;
 
-bool CommService::initialize() {
+bool WebService::initialize() {
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
     auto *hs = factory->getService<IHttpRegister>();
@@ -30,7 +30,7 @@ bool CommService::initialize() {
 
 #define BasePath "v1/catalog"
     hs->registerMapping(HttpMethod::Post, BasePath "/exchange",
-                        HttpCallback<CommService>(this, &CommService::onExchange));
+                        HttpCallback<WebService>(this, &WebService::onExchange));
 
     // register web server.
     auto *cs = factory->getService<IConfigService>();
@@ -45,7 +45,7 @@ bool CommService::initialize() {
     return SsoService::initialize();
 }
 
-bool CommService::unInitialize() {
+bool WebService::unInitialize() {
     SsoService::unInitialize();
 
     ServiceFactory *factory = ServiceFactory::instance();
@@ -58,7 +58,7 @@ bool CommService::unInitialize() {
     return true;
 }
 
-String CommService::getBundlePath() {
+String WebService::getBundlePath() {
     String bundlePath;
     const String appPath = Path::getAppPath();
     bundlePath = Path::combine(appPath, www_bundle_str);
@@ -74,9 +74,9 @@ String CommService::getBundlePath() {
     return bundlePath;
 }
 
-HttpStatus CommService::onExchange(const HttpRequest &request, HttpResponse &response) {
+HttpStatus WebService::onExchange(const HttpRequest &request, HttpResponse &response) {
     JsonNode result;
-    const HttpStringContent *content = dynamic_cast<const HttpStringContent *>(request.content);
+    auto content = dynamic_cast<const HttpStringContent *>(request.content);
     JsonNode root;
     if (content != nullptr && JsonNode::parse(content->value(), root)) {
 //        {
@@ -115,7 +115,7 @@ HttpStatus CommService::onExchange(const HttpRequest &request, HttpResponse &res
 
         ServiceFactory *factory = ServiceFactory::instance();
         assert(factory);
-        auto *ds = factory->getService<DataService>();
+        auto *ds = factory->getService<ExcService>();
         assert(ds);
 
         JsonNode dataNode("data");

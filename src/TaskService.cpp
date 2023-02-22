@@ -3,7 +3,7 @@
 //  tserver
 //
 //  Created by baowei on 2022/12/16.
-//  Copyright © 2022 com. All rights reserved.
+//  Copyright (c) 2022 com. All rights reserved.
 //
 
 #include "configuration/ConfigService.h"
@@ -18,263 +18,59 @@
 #include "crypto/Md5Provider.h"
 #include "IO/Zip.h"
 #include "TaskService.h"
-#include "DataContext.h"
+#include "HttpErrorCode.h"
+#include "tasks/TaskContext.h"
 
 using namespace IO;
 using namespace Config;
 using namespace Crypto;
 
-TaskService::Task::Task(const String &path) : _path(path) {
-}
-
-TaskService::Task::~Task() = default;
-
-void TaskService::Task::invoke() {
-    String appFileName = Path::combine(_path, app, app);
-    if (File::exists(appFileName)) {
-        Process process;
-        process.setRedirectStdout(true);
-        process.setWaitingTimeout(3000);
-        Process::start(appFileName, param, &process);
-        Trace::info(process.stdoutStr());
-    }
-}
-
-TaskService::CycleTask::CycleTask(const String &path) : Task(path), _tick(0) {
-}
-
-TaskService::CycleTask::~CycleTask() = default;
-
-bool TaskService::CycleTask::isTimeUp() {
-    if (TickTimeout::isTimeout(_tick, interval)) {
-        _tick = TickTimeout::getCurrentTickCount();
-        return true;
-    }
-    return false;
-}
-
-DataRow TaskService::CycleTask::toDataRow(const DataTable &table) const {
-    return DataRow({
-                           DataCell(table.columns()["name"], name),
-                           DataCell(table.columns()["app"], app),
-                           DataCell(table.columns()["param"], param),
-                           DataCell(table.columns()["interval"], interval),
-                   });
-}
-
-String TaskService::CycleTask::type() const {
-    return "cycle";
-}
-
-JsonNode TaskService::CycleTask::toJsonNode() const {
-    JsonNode node;
-    node.add(JsonNode("name", name));
-    node.add(JsonNode("type", type()));
-    node.add(JsonNode("app", app));
-    node.add(JsonNode("param", param));
-    node.add(JsonNode("interval", interval));
-    return node;
-}
-
-TaskService::TimeTask::TimeTask(const String &path) : Task(path) {
-}
-
-TaskService::TimeTask::~TimeTask() = default;
-
-bool TaskService::TimeTask::isTimeUp() {
-    static uint32_t current = 0;
-    if (TickTimeout::isTimeout(current, TimeSpan::fromMinutes(1))) {
-        current = TickTimeout::getCurrentTickCount();
-
-        if (String::equals(repeatType, "week", true)) {
-            Vector<DayOfWeek> weeks;
-            if (parseWeeks(repeatValue, weeks)) {
-                DateTime now = DateTime::now();
-                if (weeks.contains(now.dayOfWeek()) &&
-                    time.hour() == now.hour() && time.minute() == now.minute()) {
-                    return true;
-                }
-            }
-        } else if (String::equals(repeatType, "day", true)) {
-            DateTime now = DateTime::now();
-            if (time.hour() == now.hour() && time.minute() == now.minute()) {
-                return true;
-            }
-        } else if (String::equals(repeatType, "month", true)) {
-            Vector<int> months;
-            if (parseMonths(repeatValue, months)) {
-                DateTime now = DateTime::now();
-                if (months.contains(now.month()) &&
-                    time.day() == now.day() && time.hour() == now.hour() && time.minute() == now.minute()) {
-                    return true;
-                }
-            }
-        } else if (String::equals(repeatType, "quarter", true)) {
-            Vector<int> quarters;
-            if (parseQuarters(repeatValue, quarters)) {
-                DateTime now = DateTime::now();
-                if (quarters.contains(now.month() / 4 + 1) &&
-                    time.day() == now.day() && time.hour() == now.hour() && time.minute() == now.minute()) {
-                    return true;
-                }
-            }
-        }
-    }
-    return false;
-}
-
-DataRow TaskService::TimeTask::toDataRow(const DataTable &table) const {
-    return DataRow({
-                           DataCell(table.columns()["name"], name),
-                           DataCell(table.columns()["app"], app),
-                           DataCell(table.columns()["param"], param),
-                           DataCell(table.columns()["time"], time),
-                           DataCell(table.columns()["repeatType"], repeatType),
-                           DataCell(table.columns()["repeatValue"], repeatValue),
-                   });
-}
-
-String TaskService::TimeTask::type() const {
-    return "time";
-}
-
-JsonNode TaskService::TimeTask::toJsonNode() const {
-    JsonNode node;
-    node.add(JsonNode("name", name));
-    node.add(JsonNode("type", type()));
-    node.add(JsonNode("app", app));
-    node.add(JsonNode("param", param));
-    node.add(JsonNode("time", time));
-    node.add(JsonNode("repeatType", repeatType));
-    node.add(JsonNode("repeatValue", repeatValue));
-    return node;
-}
-
-StringArray TaskService::TimeTask::allRepeatTypes() {
-    return {"week", "day", "month", "quarter"};
-}
-
-bool TaskService::TimeTask::parseWeeks(const String &value, Vector<DayOfWeek> &weeks) {
-    if (value.find('-') > 0) {
-        StringArray texts;
-        StringArray::parse(value, texts, '-');
-        if (texts.count() == 2) {
-            int start, end;
-            if (Int32::parse(texts[0], start) &&
-                Int32::parse(texts[1], end) &&
-                start >= DayOfWeek::Sunday && start <= DayOfWeek::Saturday &&
-                end >= DayOfWeek::Sunday && end <= DayOfWeek::Saturday &&
-                end >= start) {
-                for (int week = start; week <= end; ++week) {
-                    weeks.add((DayOfWeek) week);
-                }
-                return true;
-            }
-        }
-    } else {
-        StringArray texts;
-        StringArray::parse(value, texts, ',');
-        for (size_t i = 0; i < texts.count(); ++i) {
-            int week;
-            if (Int32::parse(texts[i], week) &&
-                week >= DayOfWeek::Sunday && week <= DayOfWeek::Saturday) {
-                weeks.add((DayOfWeek) week);
-            }
-        }
-        return weeks.count() > 0;
-    }
-    return false;
-}
-
-bool TaskService::TimeTask::parseMonths(const String &value, Vector<int> &months) {
-    if (value.find('-') > 0) {
-        StringArray texts;
-        StringArray::parse(value, texts, '-');
-        if (texts.count() == 2) {
-            int start, end;
-            if (Int32::parse(texts[0], start) &&
-                Int32::parse(texts[1], end) &&
-                start >= 1 && start <= 12 && end >= 1 && end <= 12 &&
-                end >= start) {
-                for (int month = start; month <= end; ++month) {
-                    months.add(month);
-                }
-                return true;
-            }
-        }
-    } else {
-        StringArray texts;
-        StringArray::parse(value, texts, ',');
-        for (size_t i = 0; i < texts.count(); ++i) {
-            int month;
-            if (Int32::parse(texts[i], month) &&
-                month >= 1 && month <= 12) {
-                months.add(month);
-            }
-        }
-        return months.count() > 0;
-    }
-    return false;
-}
-
-bool TaskService::TimeTask::parseQuarters(const String &value, Vector<int> &quarters) {
-    if (value.find('-') > 0) {
-        StringArray texts;
-        StringArray::parse(value, texts, '-');
-        if (texts.count() == 2) {
-            int start, end;
-            if (Int32::parse(texts[0], start) &&
-                Int32::parse(texts[1], end) &&
-                start >= 1 && start <= 4 && end >= 1 && end <= 4 &&
-                end >= start) {
-                for (int month = start; month <= end; ++month) {
-                    quarters.add(month);
-                }
-                return true;
-            }
-        }
-    } else {
-        StringArray texts;
-        StringArray::parse(value, texts, ',');
-        for (size_t i = 0; i < texts.count(); ++i) {
-            int month;
-            if (Int32::parse(texts[i], month) &&
-                month >= 1 && month <= 4) {
-                quarters.add(month);
-            }
-        }
-        return quarters.count() > 0;
-    }
-    return false;
-}
-
 TaskService::TaskService() : _timer(nullptr) {
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
-    factory->addService<TaskService>(this);
+    factory->addService<ITaskExecution>(this);
+    factory->addService<IConfigService>("TaskService", this);
 }
 
 TaskService::~TaskService() {
-    delete _timer;
-    _timer = nullptr;
+    if (_timer != nullptr) {
+        delete _timer;
+        _timer = nullptr;
+    }
 
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
-    factory->removeService<TaskService>();
+    factory->removeService<ITaskExecution>();
+    factory->removeService<IConfigService>("TaskService");
 }
 
 bool TaskService::initialize() {
+    loadData();
+
+    initDataSources();
+
     initTasks();
 
-    static const TimeSpan interval = TimeSpan::fromSeconds(1);
-    _timer = new Timer("timingTask.timer",
-                       TimerCallback<TaskService>(this, &TaskService::taskTimeUp),
-                       interval, interval);
+    _dbService.initialize();
+
+    if (_timer == nullptr) {
+        static const TimeSpan interval = TimeSpan::fromSeconds(1);
+        _timer = new Timer("task.timer",
+                           TimerCallback<TaskService>(this, &TaskService::taskTimeUp),
+                           interval, interval);
+    }
 
     return true;
 }
 
 bool TaskService::unInitialize() {
+    if (_timer != nullptr) {
+        delete _timer;
+        _timer = nullptr;
+    }
+
+    _dbService.unInitialize();
+
     return true;
 }
 
@@ -289,7 +85,7 @@ void TaskService::initTasks() {
 
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
-    auto *cs = factory->getService<IConfigService>();
+    auto cs = factory->getService<IConfigService>("TaskService");
     assert(cs);
 
     for (int i = 0; i < maxTaskCount; i++) {
@@ -306,16 +102,18 @@ void TaskService::initTasks() {
             cs->getProperty(String::format(taskPrefix "app", i), app);
             cs->getProperty(String::format(taskPrefix "param", i), param);
 
+            Task *task = nullptr;
             if (type == "cycle") {
                 TimeSpan interval;
                 cs->getProperty(String::format(taskPrefix "interval", i), interval);
                 if (interval != TimeSpan::Zero) {
-                    auto *task = new CycleTask(path);
-                    task->name = name;
-                    task->app = app;
-                    task->param = param;
-                    task->interval = interval;
-                    _tasks.add(task);
+                    auto ct = new CycleTask(path);
+                    ct->name = name;
+                    ct->app = app;
+                    ct->param = param;
+                    ct->interval = interval;
+                    task = ct;
+                    _tasks.add(ct);
                 }
             } else if (type == "time") {
                 DateTime time;
@@ -324,17 +122,55 @@ void TaskService::initTasks() {
                 cs->getProperty(String::format(taskPrefix "repeat.type", i), repeatType);
                 cs->getProperty(String::format(taskPrefix "repeat.value", i), repeatValue);
                 if (time != DateTime::MinValue) {
-                    auto *task = new TimeTask(path);
-                    task->name = name;
-                    task->app = app;
-                    task->param = param;
-                    task->time = time;
-                    task->repeatType = repeatType;
-                    task->repeatValue = repeatValue;
-                    _tasks.add(task);
+                    auto tt = new TimeTask(path);
+                    tt->name = name;
+                    tt->app = app;
+                    tt->param = param;
+                    tt->time = time;
+                    tt->repeatType = repeatType;
+                    tt->repeatValue = repeatValue;
+                    task = tt;
+                    _tasks.add(tt);
                 }
             } else {
                 Trace::error(String::format("Can not find task type'%s'!", type.c_str()));
+            }
+
+            if (task != nullptr) {
+                for (int j = 0; j < maxActionCount; j++) {
+                    String actionName;
+                    if (!cs->getProperty(String::format(actionPrefix "name", i, j), actionName)) {
+                        break;
+                    }
+                    Action action(actionName);
+                    task->actions.add(action);
+                }
+                for (int j = 0; j < maxTableCount; j++) {
+                    String tableName;
+                    if (!cs->getProperty(String::format(tablePrefix "name", i, j), tableName)) {
+                        break;
+                    }
+                    bool tEnable = true;
+                    cs->getProperty(String::format(tablePrefix "enable", i, j), tEnable);
+                    if (tEnable) {
+                        Table table(tableName);
+                        cs->getProperty(String::format(tablePrefix "datasource", i, j), table.datasource);
+                        cs->getProperty(String::format(tablePrefix "style", i, j), table.style);
+                        for (int k = 0; k < maxColumnCount; k++) {
+                            String columnName;
+                            if (!cs->getProperty(String::format(columnPrefix "name", i, j, k), columnName)) {
+                                break;
+                            }
+                            Column column(columnName);
+                            cs->getProperty(String::format(columnPrefix "register", i, j, k), column.registerStr);
+                            cs->getProperty(String::format(columnPrefix "style", i, j, k), column.style);
+                            cs->getProperty(String::format(columnPrefix "type", i, j, k), column.type);
+                            cs->getProperty(String::format(columnPrefix "pkey", i, j, k), column.pkey);
+                            table.columns.add(column);
+                        }
+                        task->tables.add(table);
+                    }
+                }
             }
         }
     }
@@ -343,11 +179,11 @@ void TaskService::initTasks() {
 String TaskService::getAppPath() {
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
-    auto *cs = factory->getService<IConfigService>();
+    auto cs = factory->getService<IConfigService>();
     assert(cs);
 
     String subPath;
-    cs->getProperty("summer.timingTask.path", subPath);
+    cs->getProperty("summer.task.path", subPath);
     const String appPath = Path::getAppPath();
     String path = Path::combine(appPath, subPath);
     if (!Directory::exists(path)) {
@@ -363,7 +199,7 @@ void TaskService::taskTimeUp() {
     for (size_t i = 0; i < _tasks.count(); ++i) {
         Task *task = _tasks[i];
         if (task->isTimeUp()) {
-            task->invoke();
+            task->execute();
         }
     }
 }
@@ -552,7 +388,7 @@ bool TaskService::removeTask(const StringMap &request, StringMap &response) {
     // update profile yml file.
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
-    auto *cs = factory->getService<IConfigService>();
+    auto cs = factory->getService<IConfigService>();
     assert(cs);
 
     YmlNode::Properties properties;
@@ -649,7 +485,7 @@ bool TaskService::addOrUpdateTask(const StringMap &request, StringMap &response,
         // update profile yml file.
         ServiceFactory *factory = ServiceFactory::instance();
         assert(factory);
-        auto *cs = factory->getService<IConfigService>();
+        auto cs = factory->getService<IConfigService>();
         assert(cs);
 
         YmlNode::Properties properties;
@@ -704,4 +540,138 @@ void TaskService::updateYmlProperties(const Task *task, int position, YmlNode::P
 
 void TaskService::updateYmlProperties(bool enable, int position, YmlNode::Properties &properties) {
     properties.add(String::format(taskPrefix "enable", position), enable);
+}
+
+
+void TaskService::initDataSources() {
+    ServiceFactory *factory = ServiceFactory::instance();
+    assert(factory);
+    auto *cs = factory->getService<IConfigService>("TaskService");
+    assert(cs);
+
+//    cs->printProperties();
+
+    _dss.clear();
+    for (int i = 0; i < maxDataSourceCount; i++) {
+        String dsName;
+        if (!cs->getProperty(String::format(dataSourcePrefix "name", i), dsName)) {
+            break;
+        }
+        DataSource *ds = nullptr;
+        String type = cs->getProperty(String::format(dataSourcePrefix "type", i));
+        if (String::equals(type, "Database", true)) {
+            auto *db = new DbSource(dsName);
+            cs->getProperty(String::format(dataSourcePrefix "username", i), db->userName);
+            cs->getProperty(String::format(dataSourcePrefix "password", i), db->password);
+            cs->getProperty(String::format(dataSourcePrefix "url", i), db->url);
+            ds = db;
+        } else if (String::equals(type, "D5000", true)) {
+            auto *d5k = new D5kSource(dsName);
+            cs->getProperty(String::format(dataSourcePrefix "appNo", i), d5k->appNo);
+            ds = d5k;
+        }
+        if (ds != nullptr) {
+            ds->createProvider();
+            _dss.add(ds);
+        }
+    }
+}
+
+bool TaskService::execute(const Task *task) {
+    if (task == nullptr) {
+        return false;
+    }
+
+    ServiceFactory *factory = ServiceFactory::instance();
+    assert(factory);
+    auto ss = factory->getService<TaskDbService>();
+    assert(ss);
+
+    bool executed = false;
+    for (size_t i = 0; i < task->actions.count(); ++i) {
+        const Action &action = task->actions[i];
+        if (String::equals(action.name, "delete all", true)) {
+            ss->deleteAll(task->tables);
+            executed = true;
+        } else if (String::equals(action.name, "insert", true)) {
+            // retrieved from provider.
+            for (size_t j = 0; j < task->tables.count(); ++j) {
+                const Table &table = task->tables[j];
+                ITaskProvider *provider = getProvider(table.datasource);
+                if (provider != nullptr) {
+                    DataTable dataTable(table.name);
+                    if (provider->getValue(table, dataTable)) {
+                        // executed insert.
+                        ss->insert(table, dataTable);
+                        executed = true;
+                    }
+                }
+            }
+        }
+    }
+    return executed;
+}
+
+ITaskProvider *TaskService::getProvider(const String &dsName) const {
+    for (size_t i = 0; i < _dss.count(); ++i) {
+        const DataSource *ds = _dss[i];
+        if (ds->name == dsName) {
+            return ds->provider();
+        }
+    }
+    return nullptr;
+}
+
+const YmlNode::Properties &TaskService::properties() const {
+    return _properties;
+}
+
+bool TaskService::setProperty(const String &key, const String &value) {
+    _properties.add(key, value);
+    return true;
+}
+
+bool TaskService::updateConfigFile(const YmlNode::Properties &properties) {
+    ServiceFactory *factory = ServiceFactory::instance();
+    assert(factory);
+    auto cs = factory->getService<IConfigService>();
+    assert(cs);
+
+    String path = Application::instance()->rootPath();
+    String name = cs->getProperty("summer.task.file.name");
+    String fileName = Path::combine(path, String::format("%s.yml", name.c_str()));
+    bool result = YmlNode::updateFile(fileName, properties);
+    if (result) {
+        // update properties in memory.
+        StringArray keys;
+        properties.keys(keys);
+        for (size_t i = 0; i < keys.count(); i++) {
+            const String &key = keys[i];
+            String value;
+            if (properties.at(key, value)) {
+                _properties.add(key, value);
+            }
+        }
+    }
+    return result;
+}
+
+bool TaskService::loadData() {
+    ServiceFactory *factory = ServiceFactory::instance();
+    assert(factory);
+    auto cs = factory->getService<IConfigService>();
+    assert(cs);
+
+    String type;
+    cs->getProperty("summer.task.type", type);
+    if (String::equals(type, "file", true)) {
+        // load yml file.
+        String path = Application::instance()->rootPath();
+        String name = cs->getProperty("summer.task.file.name");
+        String fileName = Path::combine(path, String::format("%s.yml", name.c_str()));
+        return YmlNode::loadFile(fileName, _properties);
+    } else if (String::equals(type, "database", true)) {
+        // todo: load from database.
+    }
+    return false;
 }

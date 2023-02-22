@@ -1,23 +1,23 @@
 //
-//  CommService.h
+//  WebService.h
 //  tserver
 //
 //  Created by baowei on 2022/12/16.
-//  Copyright © 2022 com. All rights reserved.
+//  Copyright (c) 2022 com. All rights reserved.
 //
 
-#ifndef TSERVER_COMMSERVICE_H
-#define TSERVER_COMMSERVICE_H
+#ifndef TSERVER_WEBSERVICE_H
+#define TSERVER_WEBSERVICE_H
 
 #include "microservice/SsoService.h"
 
 using namespace Microservice;
 
-class CommService : public SsoService {
+class WebService : public SsoService {
 public:
-    CommService();
+    WebService();
 
-    ~CommService() override;
+    ~WebService() override;
 
     bool initialize() override;
 
@@ -34,4 +34,4 @@ private:
 };
 
 
-#endif //TSERVER_COMMSERVICE_H
+#endif //TSERVER_WEBSERVICE_H

@@ -1,12 +1,11 @@
 //
-//  SimulatorService.cpp
+//  ExcSimProvider.cpp
 //  tserver
 //
 //  Created by baowei on 2022/12/17.
-//  Copyright © 2022 com. All rights reserved.
+//  Copyright (c) 2022 com. All rights reserved.
 //
 
-#include "SimulatorService.h"
 #include "system/ServiceFactory.h"
 #include "configuration/ConfigService.h"
 #include "thread/TickTimeout.h"
@@ -15,34 +14,36 @@
 #include "system/Math.h"
 #include "IO/Path.h"
 #include "IO/Directory.h"
+#include "ExcSimProvider.h"
+#include "../HttpErrorCode.h"
 
 using namespace Config;
 using namespace IO;
 using namespace System;
 
-SimulatorService::Tag::Tag(const String &registerStr) : registerStr(registerStr), value(Variant::Null),
-                                                        _oldValue(Double::NaN) {
+ExcSimProvider::Tag::Tag(const String &registerStr) : registerStr(registerStr), value(Variant::Null),
+                                                      _oldValue(Double::NaN) {
 }
 
-SimulatorService::Tag::Tag(const Tag &tag) : _oldValue(Double::NaN) {
+ExcSimProvider::Tag::Tag(const Tag &tag) : _oldValue(Double::NaN) {
     Tag::evaluates(tag);
 }
 
-bool SimulatorService::Tag::equals(const Tag &other) const {
+bool ExcSimProvider::Tag::equals(const Tag &other) const {
     return this->name == other.name &&
            this->registerStr == other.registerStr &&
            this->style == other.style &&
            this->value == other.value;
 }
 
-void SimulatorService::Tag::evaluates(const Tag &other) {
+void ExcSimProvider::Tag::evaluates(const Tag &other) {
     this->name = other.name;
     this->registerStr = other.registerStr;
     this->style = other.style;
     this->value = other.value;
 }
 
-void SimulatorService::Tag::runOnce(const Label *label) {
+void ExcSimProvider::Tag::runOnce(const Label *label) {
     double minValue, maxValue, step;
     if (!parseDoubleStyle(style, minValue, maxValue, step)) {
         minValue = label->minValue;
@@ -147,7 +148,7 @@ void SimulatorService::Tag::runOnce(const Label *label) {
     }
 }
 
-String SimulatorService::Tag::getValue(const SqlSelectFilter &filter) const {
+String ExcSimProvider::Tag::getValue(const SqlSelectFilter &filter) const {
     if (String::equals(registerStr, "array", true)) {
         StringArray texts;
         StringArray::parse(style, texts, ';');
@@ -174,7 +175,7 @@ String SimulatorService::Tag::getValue(const SqlSelectFilter &filter) const {
     }
 }
 
-bool SimulatorService::Tag::parseDoubleStyle(const String &style, double &minValue, double &maxValue, double &step) {
+bool ExcSimProvider::Tag::parseDoubleStyle(const String &style, double &minValue, double &maxValue, double &step) {
     if (style.isNullOrEmpty()) {
         return false;
     }
@@ -213,14 +214,14 @@ bool SimulatorService::Tag::parseDoubleStyle(const String &style, double &minVal
     return result;
 }
 
-SimulatorService::Label::Label() : minValue(0), maxValue(100), step(1), _tick(0) {
+ExcSimProvider::Label::Label() : minValue(0), maxValue(100), step(1), _tick(0) {
 }
 
-SimulatorService::Label::Label(const Label &label) : minValue(0), maxValue(100), step(1), _tick(0) {
+ExcSimProvider::Label::Label(const Label &label) : minValue(0), maxValue(100), step(1), _tick(0) {
     Label::evaluates(label);
 }
 
-bool SimulatorService::Label::equals(const Label &other) const {
+bool ExcSimProvider::Label::equals(const Label &other) const {
     return this->name == other.name &&
            this->minValue == other.minValue &&
            this->maxValue == other.maxValue &&
@@ -229,7 +230,7 @@ bool SimulatorService::Label::equals(const Label &other) const {
            this->tags == other.tags;
 }
 
-void SimulatorService::Label::evaluates(const Label &other) {
+void ExcSimProvider::Label::evaluates(const Label &other) {
     this->name = other.name;
     this->minValue = other.minValue;
     this->maxValue = other.maxValue;
@@ -238,7 +239,7 @@ void SimulatorService::Label::evaluates(const Label &other) {
     this->tags = other.tags;
 }
 
-bool SimulatorService::Label::isTimeUp() {
+bool ExcSimProvider::Label::isTimeUp() {
     if (_tick == 0) {
         _tick = TickTimeout::getCurrentTickCount();
     }
@@ -249,7 +250,7 @@ bool SimulatorService::Label::isTimeUp() {
     return false;
 }
 
-DataRow SimulatorService::Label::toDataRow(const DataTable &table) const {
+DataRow ExcSimProvider::Label::toDataRow(const DataTable &table) const {
     return DataRow({
                            DataCell(table.columns()["name"], name),
                            DataCell(table.columns()["range"], toRangeStr()),
@@ -259,11 +260,11 @@ DataRow SimulatorService::Label::toDataRow(const DataTable &table) const {
                    });
 }
 
-String SimulatorService::Label::toRangeStr() const {
+String ExcSimProvider::Label::toRangeStr() const {
     return String::format("%s-%s", Double(minValue).toString().c_str(), Double(maxValue).toString().c_str());
 }
 
-String SimulatorService::Label::toTagsStr() const {
+String ExcSimProvider::Label::toTagsStr() const {
     JsonNode result("columns", JsonNode::TypeArray);
     for (size_t i = 0; i < tags.count(); ++i) {
         const Tag &tag = tags[i];
@@ -276,11 +277,11 @@ String SimulatorService::Label::toTagsStr() const {
     return result.toString();
 }
 
-bool SimulatorService::Label::findName(const String &n) const {
+bool ExcSimProvider::Label::findName(const String &n) const {
     return n.isNullOrEmpty() || this->name.find(n) >= 0;
 }
 
-bool SimulatorService::Label::findTagName(const String &tagNames) const {
+bool ExcSimProvider::Label::findTagName(const String &tagNames) const {
     if (tagNames.isNullOrEmpty()) {
         return true;
     }
@@ -298,7 +299,7 @@ bool SimulatorService::Label::findTagName(const String &tagNames) const {
     return false;
 }
 
-JsonNode SimulatorService::Label::toJsonNode() const {
+JsonNode ExcSimProvider::Label::toJsonNode() const {
     JsonNode node;
     node.add(JsonNode("name", name));
     node.add(JsonNode("range", toRangeStr()));
@@ -308,7 +309,7 @@ JsonNode SimulatorService::Label::toJsonNode() const {
     return node;
 }
 
-bool SimulatorService::Label::parseRange(const String &str, double &minValue, double &maxValue) {
+bool ExcSimProvider::Label::parseRange(const String &str, double &minValue, double &maxValue) {
     StringArray texts;
     Convert::splitStr(str, texts, '-');
     if (texts.count() == 2) {
@@ -323,7 +324,7 @@ bool SimulatorService::Label::parseRange(const String &str, double &minValue, do
     return false;
 }
 
-bool SimulatorService::Label::parseTags(const String &str, Tags &tags) {
+bool ExcSimProvider::Label::parseTags(const String &str, Tags &tags) {
     // str such like {"name":"tag1","register":"increase"};{"name":"tag2","register":"decrease"};{"name":"tag3","register":"random"}
     StringArray tagsTexts;
     Convert::splitStr(str, tagsTexts, ';');
@@ -340,9 +341,9 @@ bool SimulatorService::Label::parseTags(const String &str, Tags &tags) {
     return tags.count() > 0;
 }
 
-SimulatorService::Column::Column() = default;
+ExcSimProvider::Column::Column() = default;
 
-SimulatorService::Column::Column(const String &name, const String &registerStr, const String &style) {
+ExcSimProvider::Column::Column(const String &name, const String &registerStr, const String &style) {
     this->name = name;
     this->registerStr = registerStr;
     this->style = style;
@@ -368,25 +369,25 @@ SimulatorService::Column::Column(const String &name, const String &registerStr, 
     }
 }
 
-SimulatorService::Column::Column(const Column &Column) {
+ExcSimProvider::Column::Column(const Column &Column) {
     Column::evaluates(Column);
 }
 
-bool SimulatorService::Column::equals(const Column &other) const {
+bool ExcSimProvider::Column::equals(const Column &other) const {
     return this->name == other.name &&
            this->registerStr == other.registerStr &&
            this->style == other.style &&
            this->value == other.value;
 }
 
-void SimulatorService::Column::evaluates(const Column &other) {
+void ExcSimProvider::Column::evaluates(const Column &other) {
     this->name = other.name;
     this->registerStr = other.registerStr;
     this->style = other.style;
     this->value = other.value;
 }
 
-String SimulatorService::Column::getValue(const Table *table, const SqlSelectFilter &filter, int row) const {
+String ExcSimProvider::Column::getValue(const Table *table, const SqlSelectFilter &filter, int row) const {
     String result;
     if (String::equals(registerStr, "increase", true)) {
         double minValue, maxValue, step;
@@ -531,7 +532,7 @@ String SimulatorService::Column::getValue(const Table *table, const SqlSelectFil
     return result;
 }
 
-bool SimulatorService::Column::parseStyle(const String &str, String &style) {
+bool ExcSimProvider::Column::parseStyle(const String &str, String &style) {
     JsonNode node;
     if (JsonNode::parse(str, node)) {
         StringArray names;
@@ -551,7 +552,7 @@ bool SimulatorService::Column::parseStyle(const String &str, String &style) {
     }
 }
 
-bool SimulatorService::Column::parseDoubleStyle(const String &style, double &minValue, double &maxValue, double &step) {
+bool ExcSimProvider::Column::parseDoubleStyle(const String &style, double &minValue, double &maxValue, double &step) {
     if (style.isNullOrEmpty()) {
         return false;
     }
@@ -590,14 +591,14 @@ bool SimulatorService::Column::parseDoubleStyle(const String &style, double &min
     return result;
 }
 
-SimulatorService::Table::Table() : minValue(0), maxValue(100), step(1), rowCount(0) {
+ExcSimProvider::Table::Table() : minValue(0), maxValue(100), step(1), rowCount(0) {
 }
 
-SimulatorService::Table::Table(const Table &Table) : minValue(0), maxValue(100), step(1), rowCount(0) {
+ExcSimProvider::Table::Table(const Table &Table) : minValue(0), maxValue(100), step(1), rowCount(0) {
     Table::evaluates(Table);
 }
 
-bool SimulatorService::Table::equals(const Table &other) const {
+bool ExcSimProvider::Table::equals(const Table &other) const {
     return this->name == other.name &&
            this->minValue == other.minValue &&
            this->maxValue == other.maxValue &&
@@ -606,7 +607,7 @@ bool SimulatorService::Table::equals(const Table &other) const {
            this->columns == other.columns;
 }
 
-void SimulatorService::Table::evaluates(const Table &other) {
+void ExcSimProvider::Table::evaluates(const Table &other) {
     this->name = other.name;
     this->minValue = other.minValue;
     this->maxValue = other.maxValue;
@@ -615,7 +616,7 @@ void SimulatorService::Table::evaluates(const Table &other) {
     this->columns = other.columns;
 }
 
-DataRow SimulatorService::Table::toDataRow(const DataTable &table) const {
+DataRow ExcSimProvider::Table::toDataRow(const DataTable &table) const {
     return DataRow({
                            DataCell(table.columns()["name"], name),
                            DataCell(table.columns()["range"], toRangeStr()),
@@ -625,11 +626,11 @@ DataRow SimulatorService::Table::toDataRow(const DataTable &table) const {
                    });
 }
 
-String SimulatorService::Table::toRangeStr() const {
+String ExcSimProvider::Table::toRangeStr() const {
     return String::format("%s-%s", Double(minValue).toString().c_str(), Double(maxValue).toString().c_str());
 }
 
-String SimulatorService::Table::toColumnsStr() const {
+String ExcSimProvider::Table::toColumnsStr() const {
     JsonNode result("columns", JsonNode::TypeArray);
     for (size_t i = 0; i < columns.count(); ++i) {
         const Column &column = columns[i];
@@ -642,11 +643,11 @@ String SimulatorService::Table::toColumnsStr() const {
     return result.toString();
 }
 
-bool SimulatorService::Table::findName(const String &n) const {
+bool ExcSimProvider::Table::findName(const String &n) const {
     return n.isNullOrEmpty() || this->name.find(n) >= 0;
 }
 
-bool SimulatorService::Table::findColumnName(const String &columnNames) const {
+bool ExcSimProvider::Table::findColumnName(const String &columnNames) const {
     if (columnNames.isNullOrEmpty()) {
         return true;
     }
@@ -665,7 +666,7 @@ bool SimulatorService::Table::findColumnName(const String &columnNames) const {
     return false;
 }
 
-JsonNode SimulatorService::Table::toJsonNode() const {
+JsonNode ExcSimProvider::Table::toJsonNode() const {
     JsonNode node;
     node.add(JsonNode("name", name));
     node.add(JsonNode("range", toRangeStr()));
@@ -675,7 +676,7 @@ JsonNode SimulatorService::Table::toJsonNode() const {
     return node;
 }
 
-bool SimulatorService::Table::parseRange(const String &str, double &minValue, double &maxValue) {
+bool ExcSimProvider::Table::parseRange(const String &str, double &minValue, double &maxValue) {
     StringArray texts;
     Convert::splitStr(str, texts, '-');
     if (texts.count() == 2) {
@@ -690,7 +691,7 @@ bool SimulatorService::Table::parseRange(const String &str, double &minValue, do
     return false;
 }
 
-bool SimulatorService::Table::parseColumns(const String &str, Columns &columns) {
+bool ExcSimProvider::Table::parseColumns(const String &str, Columns &columns) {
     // str such like {"name":"time","register":"time","style":{"range":"today","step":"01:00:00","format":"G"}};
     // {"name":"tag1","register":"increase"};{"name":"tag2","register":"decrease"};
     StringArray columnsTexts;
@@ -708,11 +709,10 @@ bool SimulatorService::Table::parseColumns(const String &str, Columns &columns) 
     return columns.count() > 0;
 }
 
-SimulatorService::SimulatorService() : _timer(nullptr) {
+ExcSimProvider::ExcSimProvider() : _timer(nullptr) {
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
-    factory->addService<SimulatorService>(this);
-    factory->addService<IConfigService>("SimulatorService", this);
+    factory->addService<IConfigService>("ExcSimProvider", this);
 
     auto *cs = factory->getService<IConfigService>();
     assert(cs);
@@ -721,7 +721,7 @@ SimulatorService::SimulatorService() : _timer(nullptr) {
     cs->getProperty("summer.exchange.type", type);
     if (String::equals(type, "simulator", true)) {
         // It's a simulator, so do initialization.
-        loadSimulatorData();
+        loadData();
 
         initLabels();
 
@@ -731,17 +731,16 @@ SimulatorService::SimulatorService() : _timer(nullptr) {
     }
 }
 
-SimulatorService::~SimulatorService() {
+ExcSimProvider::~ExcSimProvider() {
     stopSimulator();
 
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
-    factory->removeService<SimulatorService>();
-    factory->removeService<IConfigService>("SimulatorService");
+    factory->removeService<IConfigService>("ExcSimProvider");
 }
 
-FetchResult SimulatorService::getLabelValues(const String &labelName, const StringArray &tagNames,
-                                             const SqlSelectFilter &filter, StringMap &values) {
+FetchResult ExcSimProvider::getLabelValues(const String &labelName, const StringArray &tagNames,
+                                           const SqlSelectFilter &filter, StringMap &values) {
     Locker locker(&_labels);
     for (size_t i = 0; i < _labels.count(); i++) {
         const Label &label = _labels[i];
@@ -758,8 +757,8 @@ FetchResult SimulatorService::getLabelValues(const String &labelName, const Stri
     return FetchResult::RowCountError;
 }
 
-FetchResult SimulatorService::getTableValues(const String &tableName, const StringArray &columns,
-                                             const SqlSelectFilter &filter, DataTable &dataTable) {
+FetchResult ExcSimProvider::getTableValues(const String &tableName, const StringArray &columns,
+                                           const SqlSelectFilter &filter, DataTable &dataTable) {
     Locker locker(&_tables);
     for (size_t i = 0; i < _tables.count(); i++) {
         const Table &table = _tables[i];
@@ -793,7 +792,7 @@ FetchResult SimulatorService::getTableValues(const String &tableName, const Stri
     return FetchResult::RowCountError;
 }
 
-bool SimulatorService::loadSimulatorData() {
+bool ExcSimProvider::loadData() {
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
     auto *cs = factory->getService<IConfigService>();
@@ -813,13 +812,13 @@ bool SimulatorService::loadSimulatorData() {
     return false;
 }
 
-void SimulatorService::initLabels() {
+void ExcSimProvider::initLabels() {
     Locker locker(&_labels);
     _labels.clear();
 
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
-    auto *cs = factory->getService<IConfigService>("SimulatorService");
+    auto *cs = factory->getService<IConfigService>("ExcSimProvider");
     assert(cs);
 
     for (int i = 0; i < maxLabelCount; i++) {
@@ -850,13 +849,13 @@ void SimulatorService::initLabels() {
     }
 }
 
-void SimulatorService::initTables() {
+void ExcSimProvider::initTables() {
     Locker locker(&_tables);
     _tables.clear();
 
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
-    auto *cs = factory->getService<IConfigService>("SimulatorService");
+    auto *cs = factory->getService<IConfigService>("ExcSimProvider");
     assert(cs);
 
     for (int i = 0; i < maxTableCount; i++) {
@@ -897,23 +896,23 @@ void SimulatorService::initTables() {
     }
 }
 
-void SimulatorService::startSimulator() {
+void ExcSimProvider::startSimulator() {
     if (_timer != nullptr) {
         return;
     }
 
     static const TimeSpan interval = TimeSpan::fromSeconds(1);
     _timer = new Timer("simulator.timer",
-                       TimerCallback<SimulatorService>(this, &SimulatorService::labelTimeUp),
+                       TimerCallback<ExcSimProvider>(this, &ExcSimProvider::labelTimeUp),
                        interval, interval);
 }
 
-void SimulatorService::stopSimulator() {
+void ExcSimProvider::stopSimulator() {
     delete _timer;
     _timer = nullptr;
 }
 
-void SimulatorService::labelTimeUp() {
+void ExcSimProvider::labelTimeUp() {
     Locker locker(&_labels);
     for (size_t i = 0; i < _labels.count(); i++) {
         Label &label = _labels[i];
@@ -927,7 +926,7 @@ void SimulatorService::labelTimeUp() {
     }
 }
 
-bool SimulatorService::getLabels(const SqlSelectFilter &filter, DataTable &table) {
+bool ExcSimProvider::getLabels(const SqlSelectFilter &filter, DataTable &table) {
     Locker locker(&_labels);
     Labels match;
     for (size_t i = 0; i < _labels.count(); ++i) {
@@ -958,7 +957,7 @@ bool SimulatorService::getLabels(const SqlSelectFilter &filter, DataTable &table
     return true;
 }
 
-bool SimulatorService::getLabel(const StringMap &request, StringMap &response) {
+bool ExcSimProvider::getLabel(const StringMap &request, StringMap &response) {
     {
         Locker locker(&_labels);
         String name = request["name"];
@@ -977,7 +976,7 @@ bool SimulatorService::getLabel(const StringMap &request, StringMap &response) {
     return false;
 }
 
-bool SimulatorService::addLabel(const StringMap &request, StringMap &response) {
+bool ExcSimProvider::addLabel(const StringMap &request, StringMap &response) {
     Locker locker(&_labels);
     String name = request["name"];
     for (size_t i = 0; i < _labels.count(); ++i) {
@@ -991,7 +990,7 @@ bool SimulatorService::addLabel(const StringMap &request, StringMap &response) {
     return addOrUpdateLabel(request, response);
 }
 
-bool SimulatorService::removeLabel(const StringMap &request, StringMap &response) {
+bool ExcSimProvider::removeLabel(const StringMap &request, StringMap &response) {
     StringArray names;
     StringArray::parse(request["name"], names, ';');
 
@@ -1019,7 +1018,7 @@ bool SimulatorService::removeLabel(const StringMap &request, StringMap &response
     // update simulator yml file.
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
-    auto *cs = factory->getService<IConfigService>("SimulatorService");
+    auto *cs = factory->getService<IConfigService>("ExcSimProvider");
     assert(cs);
 
     YmlNode::Properties properties;
@@ -1036,7 +1035,7 @@ bool SimulatorService::removeLabel(const StringMap &request, StringMap &response
     return true;
 }
 
-bool SimulatorService::updateLabel(const StringMap &request, StringMap &response) {
+bool ExcSimProvider::updateLabel(const StringMap &request, StringMap &response) {
     Locker locker(&_labels);
     String name = request["name"];
     int position;
@@ -1057,7 +1056,7 @@ bool SimulatorService::updateLabel(const StringMap &request, StringMap &response
     return addOrUpdateLabel(request, response, position);
 }
 
-bool SimulatorService::addOrUpdateLabel(const StringMap &request, StringMap &response, int position) {
+bool ExcSimProvider::addOrUpdateLabel(const StringMap &request, StringMap &response, int position) {
     Label label;
     label.name = request["name"];
     Label::parseRange(request["range"], label.minValue, label.maxValue);
@@ -1068,7 +1067,7 @@ bool SimulatorService::addOrUpdateLabel(const StringMap &request, StringMap &res
     // update simulator yml file.
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
-    auto *cs = factory->getService<IConfigService>("SimulatorService");
+    auto *cs = factory->getService<IConfigService>("ExcSimProvider");
     assert(cs);
 
     YmlNode::Properties properties;
@@ -1090,7 +1089,7 @@ bool SimulatorService::addOrUpdateLabel(const StringMap &request, StringMap &res
     return true;
 }
 
-bool SimulatorService::addOrUpdateTable(const StringMap &request, StringMap &response, int position) {
+bool ExcSimProvider::addOrUpdateTable(const StringMap &request, StringMap &response, int position) {
     Table table;
     table.name = request["name"];
     Table::parseRange(request["range"], table.minValue, table.maxValue);
@@ -1101,7 +1100,7 @@ bool SimulatorService::addOrUpdateTable(const StringMap &request, StringMap &res
     // update simulator yml file.
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
-    auto *cs = factory->getService<IConfigService>("SimulatorService");
+    auto *cs = factory->getService<IConfigService>("ExcSimProvider");
     assert(cs);
 
     YmlNode::Properties properties;
@@ -1123,7 +1122,7 @@ bool SimulatorService::addOrUpdateTable(const StringMap &request, StringMap &res
     return true;
 }
 
-bool SimulatorService::getTables(const SqlSelectFilter &filter, DataTable &table) {
+bool ExcSimProvider::getTables(const SqlSelectFilter &filter, DataTable &table) {
     Locker locker(&_tables);
     Tables match;
     for (size_t i = 0; i < _tables.count(); ++i) {
@@ -1154,7 +1153,7 @@ bool SimulatorService::getTables(const SqlSelectFilter &filter, DataTable &table
     return true;
 }
 
-bool SimulatorService::getTable(const StringMap &request, StringMap &response) {
+bool ExcSimProvider::getTable(const StringMap &request, StringMap &response) {
     {
         Locker locker(&_tables);
         String name = request["name"];
@@ -1173,7 +1172,7 @@ bool SimulatorService::getTable(const StringMap &request, StringMap &response) {
     return false;
 }
 
-bool SimulatorService::addTable(const StringMap &request, StringMap &response) {
+bool ExcSimProvider::addTable(const StringMap &request, StringMap &response) {
     Locker locker(&_tables);
     String name = request["name"];
     for (size_t i = 0; i < _tables.count(); ++i) {
@@ -1187,7 +1186,7 @@ bool SimulatorService::addTable(const StringMap &request, StringMap &response) {
     return addOrUpdateTable(request, response);
 }
 
-bool SimulatorService::removeTable(const StringMap &request, StringMap &response) {
+bool ExcSimProvider::removeTable(const StringMap &request, StringMap &response) {
     StringArray names;
     StringArray::parse(request["name"], names, ';');
 
@@ -1215,7 +1214,7 @@ bool SimulatorService::removeTable(const StringMap &request, StringMap &response
     // update simulator yml file.
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
-    auto *cs = factory->getService<IConfigService>("SimulatorService");
+    auto *cs = factory->getService<IConfigService>("ExcSimProvider");
     assert(cs);
 
     YmlNode::Properties properties;
@@ -1232,7 +1231,7 @@ bool SimulatorService::removeTable(const StringMap &request, StringMap &response
     return true;
 }
 
-bool SimulatorService::updateTable(const StringMap &request, StringMap &response) {
+bool ExcSimProvider::updateTable(const StringMap &request, StringMap &response) {
     // find table name.
     Locker locker(&_tables);
     String name = request["name"];
@@ -1254,7 +1253,7 @@ bool SimulatorService::updateTable(const StringMap &request, StringMap &response
     return addOrUpdateTable(request, response, position);
 }
 
-void SimulatorService::updateYmlProperties(const Label &label, int position, YmlNode::Properties &properties) {
+void ExcSimProvider::updateYmlProperties(const Label &label, int position, YmlNode::Properties &properties) {
     properties.add(String::format(labelPrefix "name", position), label.name);
     properties.add(String::format(labelPrefix "range", position), label.toRangeStr());
     properties.add(String::format(labelPrefix "step", position), label.step);
@@ -1266,11 +1265,11 @@ void SimulatorService::updateYmlProperties(const Label &label, int position, Yml
     }
 }
 
-void SimulatorService::updateLabelYmlProperties(bool enable, int position, YmlNode::Properties &properties) {
+void ExcSimProvider::updateLabelYmlProperties(bool enable, int position, YmlNode::Properties &properties) {
     properties.add(String::format(labelPrefix "enable", position), enable);
 }
 
-void SimulatorService::updateYmlProperties(const Table &table, int position, YmlNode::Properties &properties) {
+void ExcSimProvider::updateYmlProperties(const Table &table, int position, YmlNode::Properties &properties) {
     properties.add(String::format(tablePrefix "name", position), table.name);
     properties.add(String::format(tablePrefix "range", position), table.toRangeStr());
     properties.add(String::format(tablePrefix "step", position), table.step);
@@ -1283,20 +1282,20 @@ void SimulatorService::updateYmlProperties(const Table &table, int position, Yml
     }
 }
 
-void SimulatorService::updateTableYmlProperties(bool enable, int position, YmlNode::Properties &properties) {
+void ExcSimProvider::updateTableYmlProperties(bool enable, int position, YmlNode::Properties &properties) {
     properties.add(String::format(tablePrefix "enable", position), enable);
 }
 
-const YmlNode::Properties &SimulatorService::properties() const {
+const YmlNode::Properties &ExcSimProvider::properties() const {
     return _properties;
 }
 
-bool SimulatorService::setProperty(const String &key, const String &value) {
+bool ExcSimProvider::setProperty(const String &key, const String &value) {
     _properties.add(key, value);
     return true;
 }
 
-bool SimulatorService::updateConfigFile(const YmlNode::Properties &properties) {
+bool ExcSimProvider::updateConfigFile(const YmlNode::Properties &properties) {
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
     auto *cs = factory->getService<IConfigService>();

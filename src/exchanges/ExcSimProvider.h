@@ -1,15 +1,15 @@
 //
-//  SimulatorService.h
+//  ExcSimProvider.h
 //  tserver
 //
 //  Created by baowei on 2022/12/17.
-//  Copyright © 2022 com. All rights reserved.
+//  Copyright (c) 2022 com. All rights reserved.
 //
 
-#ifndef TSERVER_SIMULATORSERVICE_H
-#define TSERVER_SIMULATORSERVICE_H
+#ifndef TSERVER_EXCSIMPROVIDER_H
+#define TSERVER_EXCSIMPROVIDER_H
 
-#include "DataContext.h"
+#include "ExcContext.h"
 #include "data/Variant.h"
 #include "thread/Timer.h"
 #include "system/ServiceFactory.h"
@@ -19,7 +19,7 @@ using namespace Data;
 using namespace System;
 using namespace Config;
 
-class SimulatorService : public IDataProvider, public IConfigService {
+class ExcSimProvider : public IExcProvider, public IConfigService {
 public:
     class Label;
 
@@ -160,9 +160,9 @@ public:
 
     typedef List<Table> Tables;
 
-    SimulatorService();
+    ExcSimProvider();
 
-    ~SimulatorService() override;
+    ~ExcSimProvider() override;
 
     FetchResult getLabelValues(const String &labelName, const StringArray &tagNames,
                                const SqlSelectFilter &filter, StringMap &values) override;
@@ -193,13 +193,13 @@ public:
     bool updateTable(const StringMap &request, StringMap &response);
 
 private:
-    const YmlNode::Properties &properties() const override final;
+    const YmlNode::Properties &properties() const final;
 
-    bool setProperty(const String &key, const String &value) override final;
+    bool setProperty(const String &key, const String &value) final;
 
-    bool updateConfigFile(const YmlNode::Properties &properties) override final;
+    bool updateConfigFile(const YmlNode::Properties &properties) final;
 
-    bool loadSimulatorData();
+    bool loadData();
 
     void initLabels();
 
@@ -244,4 +244,4 @@ private:
 };
 
 
-#endif //TSERVER_SIMULATORSERVICE_H
+#endif //TSERVER_EXCSIMPROVIDER_H

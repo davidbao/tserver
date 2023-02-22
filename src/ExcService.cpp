@@ -1,30 +1,31 @@
 //
-//  DataService.cpp
+//  ExcService.cpp
 //  tserver
 //
 //  Created by baowei on 2022/12/17.
-//  Copyright © 2022 com. All rights reserved.
+//  Copyright (c) 2022 com. All rights reserved.
 //
 
 #include "configuration/ConfigService.h"
-#include "DataService.h"
-#include "SimulatorService.h"
-#include "StorageService.h"
+#include "ExcService.h"
+#include "exchanges/ExcSimProvider.h"
+#include "exchanges/ExcDbProvider.h"
+#include "HttpErrorCode.h"
 
 using namespace Config;
 
-DataService::DataService() : _provider(nullptr) {
+ExcService::ExcService() : _provider(nullptr) {
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
-    factory->addService<DataService>(this);
+    factory->addService<ExcService>(this);
 
     HttpRegisters::registerCodes();
 }
 
-DataService::~DataService() {
+ExcService::~ExcService() {
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
-    factory->removeService<DataService>();
+    factory->removeService<ExcService>();
 
     if (_provider != nullptr) {
         delete _provider;
@@ -32,13 +33,13 @@ DataService::~DataService() {
     }
 }
 
-bool DataService::initialize() {
+bool ExcService::initialize() {
     _provider = createProvider(type());
 
     return true;
 }
 
-bool DataService::unInitialize() {
+bool ExcService::unInitialize() {
     if (_provider != nullptr) {
         delete _provider;
         _provider = nullptr;
@@ -47,7 +48,7 @@ bool DataService::unInitialize() {
     return true;
 }
 
-String DataService::type() const {
+String ExcService::type() const {
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
     auto *cs = factory->getService<IConfigService>();
@@ -58,7 +59,7 @@ String DataService::type() const {
     return isTypeValid(type) ? type : String::Empty;
 }
 
-bool DataService::isTypeValid(const String &type) {
+bool ExcService::isTypeValid(const String &type) {
     if (String::equals(type, "simulator", true) ||
         String::equals(type, "database", true)) {
         return true;
@@ -66,22 +67,22 @@ bool DataService::isTypeValid(const String &type) {
     return false;
 }
 
-IDataProvider *DataService::createProvider(const String &type) {
-    IDataProvider *provider = nullptr;
+IExcProvider *ExcService::createProvider(const String &type) {
+    IExcProvider *provider = nullptr;
     if (String::equals(type, "simulator", true)) {
-        provider = new SimulatorService();
+        provider = new ExcSimProvider();
     } else if (String::equals(type, "database", true)) {
-        provider = new StorageService();
+        provider = new ExcDbProvider();
     }
     return provider;
 }
 
-IDataProvider *DataService::provider() const {
+IExcProvider *ExcService::provider() const {
     return _provider;
 }
 
-FetchResult DataService::getLabelValues(const JsonNode &request, JsonNode &response) {
-    IDataProvider *provider = this->provider();
+FetchResult ExcService::getLabelValues(const JsonNode &request, JsonNode &response) {
+    IExcProvider *provider = this->provider();
     if (provider == nullptr) {
         return FetchResult::ConfigError;
     }
@@ -120,8 +121,8 @@ FetchResult DataService::getLabelValues(const JsonNode &request, JsonNode &respo
     return FetchResult::NodeNotFound;
 }
 
-FetchResult DataService::getTableValues(const JsonNode &request, JsonNode &response) {
-    IDataProvider *provider = this->provider();
+FetchResult ExcService::getTableValues(const JsonNode &request, JsonNode &response) {
+    IExcProvider *provider = this->provider();
     if (provider == nullptr) {
         return FetchResult::ConfigError;
     }
@@ -170,7 +171,7 @@ FetchResult DataService::getTableValues(const JsonNode &request, JsonNode &respo
     return FetchResult::NodeNotFound;
 }
 
-bool DataService::getType(const StringMap &request, StringMap &response) {
+bool ExcService::getType(const StringMap &request, StringMap &response) {
     String type = this->type();
     if (!type.isNullOrEmpty()) {
         JsonNode data;
@@ -183,7 +184,7 @@ bool DataService::getType(const StringMap &request, StringMap &response) {
     return false;
 }
 
-bool DataService::setType(const StringMap &request, StringMap &response) {
+bool ExcService::setType(const StringMap &request, StringMap &response) {
     String type = request["type"];
     if (isTypeValid(type)) {
         // update profile yml file.
@@ -201,7 +202,7 @@ bool DataService::setType(const StringMap &request, StringMap &response) {
         }
 
         // create a provider by type.
-        IDataProvider *provider = createProvider(type);
+        IExcProvider *provider = createProvider(type);
         assert(provider);
         if (_provider != nullptr) {
             _deletedProviders.add(_provider);
@@ -220,5 +221,87 @@ bool DataService::setType(const StringMap &request, StringMap &response) {
         response.addRange(HttpCode::at(CannotFindExchangeType));
     }
 
+    return false;
+}
+
+// Labels
+bool ExcService::getLabels(const SqlSelectFilter &filter, DataTable &table) {
+    auto esp = dynamic_cast<ExcSimProvider *>(_provider);
+    if (esp != nullptr) {
+        return esp->getLabels(filter, table);
+    }
+    return false;
+}
+
+bool ExcService::getLabel(const StringMap &request, StringMap &response) {
+    auto esp = dynamic_cast<ExcSimProvider *>(_provider);
+    if (esp != nullptr) {
+        return esp->getLabel(request, response);
+    }
+    return false;
+}
+
+bool ExcService::addLabel(const StringMap &request, StringMap &response) {
+    auto esp = dynamic_cast<ExcSimProvider *>(_provider);
+    if (esp != nullptr) {
+        return esp->addLabel(request, response);
+    }
+    return false;
+}
+
+bool ExcService::removeLabel(const StringMap &request, StringMap &response) {
+    auto esp = dynamic_cast<ExcSimProvider *>(_provider);
+    if (esp != nullptr) {
+        return esp->removeLabel(request, response);
+    }
+    return false;
+}
+
+bool ExcService::updateLabel(const StringMap &request, StringMap &response) {
+    auto esp = dynamic_cast<ExcSimProvider *>(_provider);
+    if (esp != nullptr) {
+        return esp->updateLabel(request, response);
+    }
+    return false;
+}
+
+// Tables
+bool ExcService::getTables(const SqlSelectFilter &filter, DataTable &table) {
+    auto esp = dynamic_cast<ExcSimProvider *>(_provider);
+    if (esp != nullptr) {
+        return esp->getTables(filter, table);
+    }
+    return false;
+}
+
+bool ExcService::getTable(const StringMap &request, StringMap &response) {
+    auto esp = dynamic_cast<ExcSimProvider *>(_provider);
+    if (esp != nullptr) {
+        return esp->getTable(request, response);
+    }
+    return false;
+}
+
+bool ExcService::addTable(const StringMap &request, StringMap &response) {
+    auto esp = dynamic_cast<ExcSimProvider *>(_provider);
+    if (esp != nullptr) {
+        return esp->addTable(request, response);
+    }
+    return false;
+}
+
+bool ExcService::removeTable(const StringMap &request, StringMap &response) {
+    auto esp = dynamic_cast<ExcSimProvider *>(_provider);
+    if (esp != nullptr) {
+        return esp->removeTable(request, response);
+    }
+    return false;
+}
+
+bool ExcService::updateTable(const StringMap &request, StringMap &response) {
+    auto esp = dynamic_cast<ExcSimProvider *>(_provider);
+    if (esp != nullptr) {
+        return esp->updateTable(request, response);
+    }
     return false;
 }

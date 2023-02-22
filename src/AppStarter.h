@@ -3,15 +3,15 @@
 //  tserver
 //
 //  Created by baowei on 2022/12/16.
-//  Copyright © 2022 com. All rights reserved.
+//  Copyright (c) 2022 com. All rights reserved.
 //
 
 #ifndef TSERVER_APPSTARTER_H
 #define TSERVER_APPSTARTER_H
 
 class AdminService;
-class CommService;
-class DataService;
+class WebService;
+class ExcService;
 class TaskService;
 
 class AppStarter {
@@ -26,9 +26,9 @@ public:
 
 private:
     AdminService* _adminService;
-    CommService* _commService;
-    DataService* _dataService;
-    TaskService* _timerService;
+    WebService* _webService;
+    ExcService* _dataService;
+    TaskService* _taskService;
 };
 
 #endif //TSERVER_APPSTARTER_H

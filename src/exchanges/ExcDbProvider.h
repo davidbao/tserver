@@ -1,26 +1,26 @@
 //
-//  StorageService.h
+//  ExcDbProvider.h
 //  tserver
 //
 //  Created by baowei on 2022/12/16.
-//  Copyright © 2022 com. All rights reserved.
+//  Copyright (c) 2022 com. All rights reserved.
 //
 
-#ifndef TSERVER_STORAGESERVICE_H
-#define TSERVER_STORAGESERVICE_H
+#ifndef TSERVER_EXCDBPROVIDER_H
+#define TSERVER_EXCDBPROVIDER_H
 
 #include "system/ServiceFactory.h"
 #include "database/SqlSelectFilter.h"
 #include "database/DbClient.h"
-#include "DataContext.h"
+#include "ExcContext.h"
 
 using namespace Database;
 
-class StorageService : public IDataProvider {
+class ExcDbProvider : public IExcProvider {
 public:
-    StorageService();
+    ExcDbProvider();
 
-    ~StorageService() override;
+    ~ExcDbProvider() override;
 
     FetchResult getLabelValues(const String &labelName, const StringArray &tagNames,
                                const SqlSelectFilter &filter, StringMap &values) override;
@@ -43,4 +43,4 @@ private:
 };
 
 
-#endif //TSERVER_STORAGESERVICE_H
+#endif //TSERVER_EXCDBPROVIDER_H

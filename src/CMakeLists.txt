@@ -93,5 +93,9 @@ if (MAC_OS)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -framework Foundation -framework SystemConfiguration")
 endif ()
 
-add_executable(tserver main.cpp AppStarter.cpp AdminService.cpp CommService.cpp StorageService.cpp TaskService.cpp DataService.cpp DataService.h SimulatorService.cpp SimulatorService.h DataContext.cpp DataContext.h)
+set(MAIN_SRC main.cpp AppStarter.cpp AdminService.cpp ExcService.cpp Style.cpp TaskService.cpp WebService.cpp)
+set(EXCHANGE_SRC exchanges/ExcDbProvider.cpp exchanges/ExcSimProvider.cpp exchanges/ExcContext.cpp)
+set(TASK_SRC tasks/TaskContext.cpp tasks/TaskD5kProvider.cpp tasks/TaskDbProvider.cpp tasks/TaskDbService.cpp)
+
+add_executable(tserver ${MAIN_SRC} ${EXCHANGE_SRC} ${TASK_SRC})
 target_link_libraries(tserver ${COMMON_LIB})

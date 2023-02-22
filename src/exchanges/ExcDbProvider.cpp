@@ -1,12 +1,12 @@
 //
-//  StorageService.cpp
+//  ExcDbProvider.cpp
 //  tserver
 //
 //  Created by baowei on 2022/12/16.
-//  Copyright © 2022 com. All rights reserved.
+//  Copyright (c) 2022 com. All rights reserved.
 //
 
-#include "StorageService.h"
+#include "ExcDbProvider.h"
 #include "IO/Path.h"
 #include "IO/File.h"
 #include "IO/Directory.h"
@@ -19,11 +19,11 @@
 using namespace Config;
 using namespace Microservice;
 
-StorageService::StorageService() = default;
+ExcDbProvider::ExcDbProvider() = default;
 
-StorageService::~StorageService() = default;
+ExcDbProvider::~ExcDbProvider() = default;
 
-DbClient *StorageService::dbClient() const {
+DbClient *ExcDbProvider::dbClient() const {
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
     auto *ds = factory->getService<IDataSourceService>();
@@ -32,7 +32,7 @@ DbClient *StorageService::dbClient() const {
     return dbClient;
 }
 
-void StorageService::createSqlFile(const String &fileName, const String &sql) {
+void ExcDbProvider::createSqlFile(const String &fileName, const String &sql) {
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
     auto *ds = factory->getService<IDataSourceService>();
@@ -40,8 +40,8 @@ void StorageService::createSqlFile(const String &fileName, const String &sql) {
     return ds->createSqlFile(fileName, sql);
 }
 
-FetchResult StorageService::getLabelValues(const String &labelName, const StringArray &tagNames,
-                                           const SqlSelectFilter &filter, StringMap &values) {
+FetchResult ExcDbProvider::getLabelValues(const String &labelName, const StringArray &tagNames,
+                                          const SqlSelectFilter &filter, StringMap &values) {
     DbClient *dbClient = this->dbClient();
     if (dbClient == nullptr)
         return FetchResult::DbError;
@@ -83,8 +83,8 @@ FetchResult StorageService::getLabelValues(const String &labelName, const String
     return FetchResult::ExecFailed;
 }
 
-FetchResult StorageService::getTableValues(const String &tableName, const StringArray &columns,
-                                           const SqlSelectFilter &filter, DataTable &table) {
+FetchResult ExcDbProvider::getTableValues(const String &tableName, const StringArray &columns,
+                                          const SqlSelectFilter &filter, DataTable &table) {
     DbClient *dbClient = this->dbClient();
     if (dbClient == nullptr)
         return FetchResult::DbError;
@@ -119,7 +119,7 @@ FetchResult StorageService::getTableValues(const String &tableName, const String
     return FetchResult::ExecFailed;
 }
 
-String StorageService::getSqlFileName(const String &name, int sqlIndex) {
+String ExcDbProvider::getSqlFileName(const String &name, int sqlIndex) {
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
     auto *cs = factory->getService<IConfigService>();
@@ -175,7 +175,7 @@ String StorageService::getSqlFileName(const String &name, int sqlIndex) {
     return String::Empty;
 }
 
-String StorageService::getSql(const String &name, int sqlIndex) {
+String ExcDbProvider::getSql(const String &name, int sqlIndex) {
     String fileName = getSqlFileName(name, sqlIndex);
     if (File::exists(fileName)) {
         FileStream fs(fileName, FileMode::FileOpenWithoutException, FileAccess::FileRead);
@@ -186,7 +186,7 @@ String StorageService::getSql(const String &name, int sqlIndex) {
     return String::Empty;
 }
 
-String StorageService::getTablePrefix() {
+String ExcDbProvider::getTablePrefix() {
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
     auto *cs = factory->getService<IConfigService>();

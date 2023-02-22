@@ -3,7 +3,7 @@
 //  tserver
 //
 //  Created by baowei on 2022/12/16.
-//  Copyright © 2022 com. All rights reserved.
+//  Copyright (c) 2022 com. All rights reserved.
 //
 
 #include "AdminService.h"
@@ -13,9 +13,9 @@
 #include "crypto/Md5Provider.h"
 #include "configuration/ConfigService.h"
 #include "TaskService.h"
-#include "SimulatorService.h"
-#include "DataService.h"
-#include "CommService.h"
+#include "ExcService.h"
+#include "WebService.h"
+#include "HttpErrorCode.h"
 
 using namespace Crypto;
 
@@ -129,7 +129,7 @@ HttpStatus AdminService::onGetExchangeType(const HttpRequest &request, HttpRespo
     auto method = [](const StringMap &tRequest, StringMap &tResponse) {
         ServiceFactory *factory = ServiceFactory::instance();
         assert(factory);
-        auto *ss = factory->getService<DataService>();
+        auto *ss = factory->getService<ExcService>();
         assert(ss);
         return ss->getType(tRequest, tResponse);
     };
@@ -141,7 +141,7 @@ HttpStatus AdminService::onSetExchangeType(const HttpRequest &request, HttpRespo
     auto method = [](const StringMap &tRequest, StringMap &tResponse) {
         ServiceFactory *factory = ServiceFactory::instance();
         assert(factory);
-        auto *ss = factory->getService<DataService>();
+        auto *ss = factory->getService<ExcService>();
         assert(ss);
         return ss->setType(tRequest, tResponse);
     };
@@ -290,10 +290,9 @@ HttpStatus AdminService::onUpdateTask(const HttpRequest &request, HttpResponse &
 bool AdminService::onGetLabelList(const HttpRequest &request, const SqlSelectFilter &filter, DataTable &table) {
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
-    auto *ss = factory->getService<SimulatorService>();
-    assert(ss);
-
-    return ss->getLabels(filter, table);
+    auto es = factory->getService<ExcService>();
+    assert(es);
+    return es->getLabels(filter, table);
 }
 
 HttpStatus AdminService::onGetLabel(const HttpRequest &request, HttpResponse &response) {
@@ -301,9 +300,9 @@ HttpStatus AdminService::onGetLabel(const HttpRequest &request, HttpResponse &re
     auto method = [](const StringMap &tRequest, StringMap &tResponse) {
         ServiceFactory *factory = ServiceFactory::instance();
         assert(factory);
-        auto *ss = factory->getService<SimulatorService>();
-        assert(ss);
-        return ss->getLabel(tRequest, tResponse);
+        auto es = factory->getService<ExcService>();
+        assert(es);
+        return es->getLabel(tRequest, tResponse);
     };
     return onAction(request, response, method);
 }
@@ -313,9 +312,9 @@ HttpStatus AdminService::onAddLabel(const HttpRequest &request, HttpResponse &re
     auto method = [](const StringMap &tRequest, StringMap &tResponse) {
         ServiceFactory *factory = ServiceFactory::instance();
         assert(factory);
-        auto *ss = factory->getService<SimulatorService>();
-        assert(ss);
-        return ss->addLabel(tRequest, tResponse);
+        auto es = factory->getService<ExcService>();
+        assert(es);
+        return es->addLabel(tRequest, tResponse);
     };
     return onAction(request, response, method);
 }
@@ -325,9 +324,9 @@ HttpStatus AdminService::onRemoveLabel(const HttpRequest &request, HttpResponse 
     auto method = [](const StringMap &tRequest, StringMap &tResponse) {
         ServiceFactory *factory = ServiceFactory::instance();
         assert(factory);
-        auto *ss = factory->getService<SimulatorService>();
-        assert(ss);
-        return ss->removeLabel(tRequest, tResponse);
+        auto es = factory->getService<ExcService>();
+        assert(es);
+        return es->removeLabel(tRequest, tResponse);
     };
     return onAction(request, response, method);
 }
@@ -337,9 +336,9 @@ HttpStatus AdminService::onUpdateLabel(const HttpRequest &request, HttpResponse 
     auto method = [](const StringMap &tRequest, StringMap &tResponse) {
         ServiceFactory *factory = ServiceFactory::instance();
         assert(factory);
-        auto *ss = factory->getService<SimulatorService>();
-        assert(ss);
-        return ss->updateLabel(tRequest, tResponse);
+        auto es = factory->getService<ExcService>();
+        assert(es);
+        return es->updateLabel(tRequest, tResponse);
     };
     return onAction(request, response, method);
 }
@@ -347,10 +346,9 @@ HttpStatus AdminService::onUpdateLabel(const HttpRequest &request, HttpResponse 
 bool AdminService::onGetTableList(const HttpRequest &request, const SqlSelectFilter &filter, DataTable &table) {
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
-    auto *ss = factory->getService<SimulatorService>();
-    assert(ss);
-
-    return ss->getTables(filter, table);
+    auto es = factory->getService<ExcService>();
+    assert(es);
+    return es->getTables(filter, table);
 }
 
 HttpStatus AdminService::onGetTable(const HttpRequest &request, HttpResponse &response) {
@@ -358,9 +356,9 @@ HttpStatus AdminService::onGetTable(const HttpRequest &request, HttpResponse &re
     auto method = [](const StringMap &tRequest, StringMap &tResponse) {
         ServiceFactory *factory = ServiceFactory::instance();
         assert(factory);
-        auto *ss = factory->getService<SimulatorService>();
-        assert(ss);
-        return ss->getTable(tRequest, tResponse);
+        auto es = factory->getService<ExcService>();
+        assert(es);
+        return es->getTable(tRequest, tResponse);
     };
     return onAction(request, response, method);
 }
@@ -370,9 +368,9 @@ HttpStatus AdminService::onAddTable(const HttpRequest &request, HttpResponse &re
     auto method = [](const StringMap &tRequest, StringMap &tResponse) {
         ServiceFactory *factory = ServiceFactory::instance();
         assert(factory);
-        auto *ss = factory->getService<SimulatorService>();
-        assert(ss);
-        return ss->addTable(tRequest, tResponse);
+        auto es = factory->getService<ExcService>();
+        assert(es);
+        return es->addTable(tRequest, tResponse);
     };
     return onAction(request, response, method);
 }
@@ -382,9 +380,9 @@ HttpStatus AdminService::onRemoveTable(const HttpRequest &request, HttpResponse 
     auto method = [](const StringMap &tRequest, StringMap &tResponse) {
         ServiceFactory *factory = ServiceFactory::instance();
         assert(factory);
-        auto *ss = factory->getService<SimulatorService>();
-        assert(ss);
-        return ss->removeTable(tRequest, tResponse);
+        auto es = factory->getService<ExcService>();
+        assert(es);
+        return es->removeTable(tRequest, tResponse);
     };
     return onAction(request, response, method);
 }
@@ -394,9 +392,9 @@ HttpStatus AdminService::onUpdateTable(const HttpRequest &request, HttpResponse 
     auto method = [](const StringMap &tRequest, StringMap &tResponse) {
         ServiceFactory *factory = ServiceFactory::instance();
         assert(factory);
-        auto *ss = factory->getService<SimulatorService>();
-        assert(ss);
-        return ss->updateTable(tRequest, tResponse);
+        auto es = factory->getService<ExcService>();
+        assert(es);
+        return es->updateTable(tRequest, tResponse);
     };
     return onAction(request, response, method);
 }
@@ -457,7 +455,7 @@ bool AdminService::uploadWebBundle(const StringMap &request, StringMap &response
     }
 
     // extract files.
-    String bundlePath = CommService::getBundlePath();
+    String bundlePath = WebService::getBundlePath();
     if (!Directory::exists(bundlePath)) {
         response.addRange(HttpCode::at(CannotFindWWWBundlePath));
         return false;
@@ -510,7 +508,7 @@ bool AdminService::enableBundle(const StringMap &request, StringMap &response) {
         assert(cs);
 
         // unregister web server.
-        String bundlePath = CommService::getBundlePath();
+        String bundlePath = WebService::getBundlePath();
         if (Directory::exists(bundlePath)) {
             if (enable) {
                 hs->registerWebPath(bundlePath);

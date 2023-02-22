@@ -3,7 +3,7 @@
 //  tserver
 //
 //  Created by baowei on 2022/12/16.
-//  Copyright © 2022 com. All rights reserved.
+//  Copyright (c) 2022 com. All rights reserved.
 //
 
 #ifndef TSERVER_TASKSERVICE_H
@@ -14,87 +14,16 @@
 #include "thread/TaskTimer.h"
 #include "database/DataTable.h"
 #include "database/SqlSelectFilter.h"
+#include "configuration/ConfigService.h"
+#include "tasks/TaskContext.h"
+#include "tasks/TaskDbService.h"
 
 using namespace Data;
+using namespace Config;
 using namespace Database;
 
-class TaskService : public IService {
+class TaskService : public IConfigService, public ITaskExecution {
 public:
-    class Task {
-    public:
-        String name;
-        String app;
-        String param;
-
-        explicit Task(const String &path);
-
-        virtual ~Task();
-
-        virtual bool isTimeUp() = 0;
-
-        virtual DataRow toDataRow(const DataTable &table) const = 0;
-
-        virtual String type() const = 0;
-
-        virtual JsonNode toJsonNode() const = 0;
-
-        void invoke();
-
-    private:
-        String _path;
-    };
-
-    typedef PList<Task> Tasks;
-
-    class CycleTask : public Task {
-    public:
-        TimeSpan interval;
-
-        explicit CycleTask(const String &path);
-
-        ~CycleTask() override;
-
-        bool isTimeUp() override;
-
-        DataRow toDataRow(const DataTable &table) const override;
-
-        String type() const override;
-
-        JsonNode toJsonNode() const override;
-
-    private:
-        uint32_t _tick;
-    };
-
-    class TimeTask : public Task {
-    public:
-        DateTime time;
-        String repeatType;
-        String repeatValue;
-
-        explicit TimeTask(const String &path);
-
-        ~TimeTask() override;
-
-        bool isTimeUp() override;
-
-        DataRow toDataRow(const DataTable &table) const override;
-
-        String type() const override;
-
-        JsonNode toJsonNode() const override;
-
-    public:
-        static StringArray allRepeatTypes();
-
-    private:
-        static bool parseWeeks(const String &value, Vector<DayOfWeek> &weeks);
-
-        static bool parseMonths(const String &value, Vector<int> &months);
-
-        static bool parseQuarters(const String &value, Vector<int> &quarters);
-    };
-
     TaskService();
 
     ~TaskService() override;
@@ -103,6 +32,7 @@ public:
 
     bool unInitialize();
 
+    // for HTTP.
     bool getTasks(const SqlSelectFilter &filter, DataTable &table);
 
     bool getTask(const StringMap &request, StringMap &response);
@@ -115,12 +45,27 @@ public:
 
     bool updateTask(const StringMap &request, StringMap &response);
 
+    // for ITaskExecution
+    bool execute(const Task *task) override;
+
 private:
     void initTasks();
 
     void taskTimeUp();
 
     bool addOrUpdateTask(const StringMap &request, StringMap &response, int position = -1);
+
+    const YmlNode::Properties &properties() const final;
+
+    bool setProperty(const String &key, const String &value) final;
+
+    bool updateConfigFile(const YmlNode::Properties &properties) final;
+
+    bool loadData();
+
+    void initDataSources();
+
+    ITaskProvider *getProvider(const String &dsName) const;
 
 private:
     static String getAppPath();
@@ -131,11 +76,27 @@ private:
 
 private:
 #define maxTaskCount 1000
-#define taskPrefix "summer.timingTask.tasks[%d]."
+#define taskPrefix "tasks[%d]."
+#define maxActionCount 100
+#define actionPrefix taskPrefix "actions[%d]."
+
+#define maxDataSourceCount 1000
+#define dataSourcePrefix "datasource[%d]."
+
+#define maxTableCount 1000
+#define tablePrefix taskPrefix "tables[%d]."
+#define maxColumnCount 100
+#define columnPrefix tablePrefix "columns[%d]."
+
+    DataSources _dss;
 
     Tasks _tasks;
 
+    YmlNode::Properties _properties;
+
     Timer *_timer;
+
+    TaskDbService _dbService;
 };
 
 
