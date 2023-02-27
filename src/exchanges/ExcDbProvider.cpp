@@ -83,7 +83,7 @@ FetchResult ExcDbProvider::getLabelValues(const String &labelName, const StringA
     return FetchResult::ExecFailed;
 }
 
-FetchResult ExcDbProvider::getTableValues(const String &tableName, const StringArray &columns,
+FetchResult ExcDbProvider::getTableValues(const String &tableName, const StringArray &colNames,
                                           const SqlSelectFilter &filter, DataTable &table) {
     DbClient *dbClient = this->dbClient();
     if (dbClient == nullptr)
@@ -95,7 +95,7 @@ FetchResult ExcDbProvider::getTableValues(const String &tableName, const StringA
     String sql;
     sql = getSql(tableName, 1);
     if (sql.isNullOrEmpty()) {
-        sql = filter.toSelectSql(name, columns.toString(','));
+        sql = filter.toSelectSql(name, colNames.toString(','));
     }
 
 #ifdef DEBUG

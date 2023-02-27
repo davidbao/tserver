@@ -112,7 +112,7 @@ public:
 
         void evaluates(const Column &other) override;
 
-        String getValue(const Table *table, const SqlSelectFilter &filter, int row) const;
+        bool getCellValue(const Table *table, const SqlSelectFilter &filter, int row, String &cellValue) const;
 
     public:
         static bool parseStyle(const String &str, String &style);
@@ -121,7 +121,16 @@ public:
         static bool parseDoubleStyle(const String &style, double &minValue, double &maxValue, double &step);
     };
 
-    typedef List<Column> Columns;
+    class Columns : public List<Column> {
+    public:
+        Columns();
+
+        ~Columns() override;
+
+        bool contains(const StringArray &names) const;
+
+        bool atByName(const String &name, Column &column) const;
+    };
 
     class Table : public IEvaluation<Table>, public IEquatable<Table> {
     public:
@@ -152,6 +161,8 @@ public:
 
         JsonNode toJsonNode() const;
 
+        bool getColumns(const StringArray &colNames, Columns &cols) const;
+
     public:
         static bool parseRange(const String &str, double &minValue, double &maxValue);
 
@@ -167,7 +178,7 @@ public:
     FetchResult getLabelValues(const String &labelName, const StringArray &tagNames,
                                const SqlSelectFilter &filter, StringMap &values) override;
 
-    FetchResult getTableValues(const String &tableName, const StringArray &columns,
+    FetchResult getTableValues(const String &tableName, const StringArray &colNames,
                                const SqlSelectFilter &filter, DataTable &dataTable) override;
 
     // Labels

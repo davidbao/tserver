@@ -16,6 +16,7 @@
 #include "IO/Directory.h"
 #include "ExcSimProvider.h"
 #include "../HttpErrorCode.h"
+#include "../Style.h"
 
 using namespace Config;
 using namespace IO;
@@ -181,35 +182,28 @@ bool ExcSimProvider::Tag::parseDoubleStyle(const String &style, double &minValue
     }
 
     bool result = true;
-    StringArray texts;
-    StringArray::parse(style, texts, ';');
-    for (size_t i = 0; i < texts.count(); ++i) {
-        char nameStr[255] = {0}, valueStr[255] = {0};
-        int rValue = sscanf(texts[i].trim().c_str(), "%[a-z|A-Z|0-9]:%s", nameStr, valueStr);
-        if (rValue >= 2) {
-            String n = String::trim(nameStr, '\'', '"', ' ');
-            String v = String::trim(valueStr, '\'', '"', ' ');
-            if (String::equals(n, "range", true)) {
-                StringArray ranges;
-                StringArray::parse(v, ranges, '-');
-                if (ranges.count() == 2) {
-                    if (!Double::parse(ranges[0], minValue)) {
-                        result = false;
-                    }
-                    if (!Double::parse(ranges[1], maxValue)) {
-                        result = false;
-                    }
-                } else {
-                    result = false;
-                }
-            } else if (String::equals(n, "step", true)) {
-                if (!Double::parse(v, step)) {
-                    result = false;
-                }
+    Style s;
+    if (Style::parse(style, s)) {
+        String rangeStr = String::trim(s["range"], '\'', '"', ' ');
+        StringArray ranges;
+        StringArray::parse(rangeStr, ranges, '-');
+        if (ranges.count() == 2) {
+            if (!Double::parse(ranges[0], minValue)) {
+                result = false;
+            }
+            if (!Double::parse(ranges[1], maxValue)) {
+                result = false;
             }
         } else {
             result = false;
         }
+
+        String stepStr = String::trim(s["step"], '\'', '"', ' ');
+        if (!Double::parse(stepStr, step)) {
+            result = false;
+        }
+    } else {
+        result = false;
     }
     return result;
 }
@@ -387,8 +381,8 @@ void ExcSimProvider::Column::evaluates(const Column &other) {
     this->value = other.value;
 }
 
-String ExcSimProvider::Column::getValue(const Table *table, const SqlSelectFilter &filter, int row) const {
-    String result;
+bool ExcSimProvider::Column::getCellValue(const Table *table, const SqlSelectFilter &filter, int row,
+                                          String &cellValue) const {
     if (String::equals(registerStr, "increase", true)) {
         double minValue, maxValue, step;
         if (!parseDoubleStyle(style, minValue, maxValue, step)) {
@@ -399,7 +393,7 @@ String ExcSimProvider::Column::getValue(const Table *table, const SqlSelectFilte
         int maxValueRowCount = (int) Math::round((maxValue - minValue) / step + 0.5);
         double v = minValue;
         v += step * (row % maxValueRowCount);
-        result = Double(v).toString();
+        cellValue = Double(v).toString();
     } else if (String::equals(registerStr, "decrease", true)) {
         double minValue, maxValue, step;
         if (!parseDoubleStyle(style, minValue, maxValue, step)) {
@@ -410,7 +404,7 @@ String ExcSimProvider::Column::getValue(const Table *table, const SqlSelectFilte
         int maxValueRowCount = (int) Math::round((maxValue - minValue) / step + 0.5);
         double v = maxValue;
         v -= step * (row % maxValueRowCount);
-        result = Double(v).toString();
+        cellValue = Double(v).toString();
     } else if (String::equals(registerStr, "random", true)) {
         double minValue, maxValue, step;
         if (!parseDoubleStyle(style, minValue, maxValue, step)) {
@@ -419,7 +413,7 @@ String ExcSimProvider::Column::getValue(const Table *table, const SqlSelectFilte
             step = table->step;
         }
         double v = Random::getRandValue(minValue, maxValue);
-        result = Double(v).toString();
+        cellValue = Double(v).toString();
     } else if (String::equals(registerStr, "sin", true)) {
         double minValue, maxValue, step;
         if (!parseDoubleStyle(style, minValue, maxValue, step)) {
@@ -435,7 +429,7 @@ String ExcSimProvider::Column::getValue(const Table *table, const SqlSelectFilte
             v = minValue;
         if (v > maxValue)
             v = maxValue;
-        result = Double(v).toString();
+        cellValue = Double(v).toString();
     } else if (String::equals(registerStr, "cos", true)) {
         double minValue, maxValue, step;
         if (!parseDoubleStyle(style, minValue, maxValue, step)) {
@@ -451,59 +445,55 @@ String ExcSimProvider::Column::getValue(const Table *table, const SqlSelectFilte
             v = minValue;
         if (v > maxValue)
             v = maxValue;
-        result = Double(v).toString();
+        cellValue = Double(v).toString();
     } else if (String::equals(registerStr, "onoff", true)) {
         bool v = (row % 2) == 0;
-        result = Boolean(v).toString();
+        cellValue = Boolean(v).toString();
     } else if (String::equals(registerStr, "time", true)) {
-        if (!style.isNullOrEmpty()) {
+        Style s;
+        if (Style::parse(style, s)) {
             DateTime minValue, maxValue;
-            TimeSpan step;
-            String format;
-            StringArray texts;
-            StringArray::parse(style, texts, ';');
-            for (size_t i = 0; i < texts.count(); ++i) {
-                char nameStr[255] = {0}, valueStr[255] = {0};
-                int rValue = sscanf(texts[i].trim().c_str(), "%[a-z|A-Z|0-9]:%s", nameStr, valueStr);
-                if (rValue >= 2) {
-                    String n = String::trim(nameStr, '\'', '"', ' ');
-                    String v = String::trim(valueStr, '\'', '"', ' ');
-                    if (String::equals(n, "range", true)) {
-                        if (String::equals(v, "today", true)) {
-                            DateTime now = DateTime::now();
-                            minValue = now.date();
-                            maxValue = now.date().addDays(1);
+            String rangeStr = String::trim(s["range"], '\'', '"', ' ');
+            if (String::equals(rangeStr, "today", true)) {
+                DateTime now = DateTime::now();
+                minValue = now.date();
+                maxValue = now.date().addDays(1);
 //                            printf("today minValue: %s, maxValue: %s\n", minValue.toString().c_str(), maxValue.toString().c_str());
-                        } else if (String::equals(v, "yesterday", true)) {
-                            DateTime now = DateTime::now();
-                            minValue = now.date().addDays(-1);
-                            maxValue = now.date();
+            } else if (String::equals(rangeStr, "yesterday", true)) {
+                DateTime now = DateTime::now();
+                minValue = now.date().addDays(-1);
+                maxValue = now.date();
 //                            printf("yesterday minValue: %s, maxValue: %s\n", minValue.toString().c_str(), maxValue.toString().c_str());
-                        } else if (String::equals(v, "thismonth", true)) {
-                            DateTime now = DateTime::now();
-                            minValue = DateTime(now.year(), now.month(), 1);
-                            maxValue = minValue.addMonths(1);
+            } else if (String::equals(rangeStr, "thismonth", true)) {
+                DateTime now = DateTime::now();
+                minValue = DateTime(now.year(), now.month(), 1);
+                maxValue = minValue.addMonths(1);
 //                            printf("yesterday minValue: %s, maxValue: %s\n", minValue.toString().c_str(), maxValue.toString().c_str());
-                        } else {
-                            StringArray ranges;
-                            StringArray::parse(v, ranges, '-');
-                            if (ranges.count() == 2) {
-                                DateTime::parse(ranges[0], minValue);
-                                DateTime::parse(ranges[1], maxValue);
-                            }
-                        }
-                    } else if (String::equals(n, "step", true)) {
-                        TimeSpan::parse(v, step);
-//                        printf("v: %s, step: %s\n", v.c_str(), step.toString().c_str());
-                    } else if (String::equals(n, "format", true)) {
-                        format = v;
-                    }
+            } else if (String::equals(rangeStr, "datetime", true) ||
+                       String::equals(rangeStr, "month", true)) {
+                DateTime::parse(filter.getFromValue(name), minValue);
+                DateTime::parse(filter.getToValue(name), maxValue);
+            } else {
+                StringArray ranges;
+                StringArray::parse(rangeStr, ranges, '-');
+                if (ranges.count() == 2) {
+                    DateTime::parse(ranges[0], minValue);
+                    DateTime::parse(ranges[1], maxValue);
                 }
             }
+            TimeSpan step;
+            TimeSpan::parse(String::trim(s["step"], '\'', '"', ' '), step);
+//            printf("v: %s, step: %s\n", v.c_str(), step.toString().c_str());
+            String formatStr = String::trim(s["format"], '\'', '"', ' ');
             if (!(minValue == DateTime::MinValue && maxValue == DateTime::MaxValue &&
-                  step == TimeSpan::Zero && !format.isNullOrEmpty())) {
+                  step == TimeSpan::Zero && !formatStr.isNullOrEmpty())) {
                 DateTime v = minValue.addTicks(step.ticks() * row);
-                result = v.toString(format);
+                if (v > maxValue) {
+                    return false;
+                }
+                cellValue = v.toString(formatStr);
+            } else {
+                return false;
             }
         }
     } else if (String::equals(registerStr, "array", true)) {
@@ -522,14 +512,16 @@ String ExcSimProvider::Column::getValue(const Table *table, const SqlSelectFilte
             }
         }
         if (row < texts.count()) {
-            result = String::trim(texts[row], '\'', '"', ' ');
+            cellValue = String::trim(texts[row], '\'', '"', ' ');
+        } else {
+            return false;
         }
     } else if (String::equals(registerStr, "uuid", true)) {
-        result = Uuid::generate().toString();
+        cellValue = Uuid::generate().toString();
     } else {
-        result = registerStr;
+        cellValue = registerStr;
     }
-    return result;
+    return true;
 }
 
 bool ExcSimProvider::Column::parseStyle(const String &str, String &style) {
@@ -558,37 +550,64 @@ bool ExcSimProvider::Column::parseDoubleStyle(const String &style, double &minVa
     }
 
     bool result = true;
-    StringArray texts;
-    StringArray::parse(style, texts, ';');
-    for (size_t i = 0; i < texts.count(); ++i) {
-        char nameStr[255] = {0}, valueStr[255] = {0};
-        int rValue = sscanf(texts[i].trim().c_str(), "%[a-z|A-Z|0-9]:%s", nameStr, valueStr);
-        if (rValue >= 2) {
-            String n = String::trim(nameStr, '\'', '"', ' ');
-            String v = String::trim(valueStr, '\'', '"', ' ');
-            if (String::equals(n, "range", true)) {
-                StringArray ranges;
-                StringArray::parse(v, ranges, '-');
-                if (ranges.count() == 2) {
-                    if (!Double::parse(ranges[0], minValue)) {
-                        result = false;
-                    }
-                    if (!Double::parse(ranges[1], maxValue)) {
-                        result = false;
-                    }
-                } else {
-                    result = false;
-                }
-            } else if (String::equals(n, "step", true)) {
-                if (!Double::parse(v, step)) {
-                    result = false;
-                }
+
+    Style s;
+    if (Style::parse(style, s)) {
+        String rangeStr = String::trim(s["rangeStr"], '\'', '"', ' ');
+        StringArray ranges;
+        StringArray::parse(rangeStr, ranges, '-');
+        if (ranges.count() == 2) {
+            if (!Double::parse(ranges[0], minValue)) {
+                result = false;
+            }
+            if (!Double::parse(ranges[1], maxValue)) {
+                result = false;
             }
         } else {
             result = false;
         }
+
+        String stepStr = String::trim(s["step"], '\'', '"', ' ');
+        if (!Double::parse(stepStr, step)) {
+            result = false;
+        }
+    } else {
+        result = false;
     }
     return result;
+}
+
+ExcSimProvider::Columns::Columns() = default;
+
+ExcSimProvider::Columns::~Columns() = default;
+
+bool ExcSimProvider::Columns::contains(const StringArray &names) const {
+    for (int i = 0; i < names.count(); ++i) {
+        const String &name = names[i];
+        bool found = false;
+        for (int j = 0; j < count(); ++j) {
+            const Column &column = at(j);
+            if (column.name == name) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool ExcSimProvider::Columns::atByName(const String &name, Column &column) const {
+    for (int i = 0; i < count(); ++i) {
+        const Column &col = at(i);
+        if (col.name == name) {
+            column = col;
+            return true;
+        }
+    }
+    return false;
 }
 
 ExcSimProvider::Table::Table() : minValue(0), maxValue(100), step(1), rowCount(0) {
@@ -676,6 +695,21 @@ JsonNode ExcSimProvider::Table::toJsonNode() const {
     return node;
 }
 
+bool ExcSimProvider::Table::getColumns(const StringArray &colNames, Columns &cols) const {
+    if (colNames.isEmpty()) {
+        cols.addRange(columns);
+    } else {
+        for (size_t i = 0; i < colNames.count(); ++i) {
+            const String &colName = colNames[i];
+            Column col;
+            if (columns.atByName(colName, col)) {
+                cols.add(col);
+            }
+        }
+    }
+    return cols.count() > 0;
+}
+
 bool ExcSimProvider::Table::parseRange(const String &str, double &minValue, double &maxValue) {
     StringArray texts;
     Convert::splitStr(str, texts, '-');
@@ -747,7 +781,7 @@ FetchResult ExcSimProvider::getLabelValues(const String &labelName, const String
         if (labelName == label.name) {
             for (size_t j = 0; j < label.tags.count(); j++) {
                 const Tag &tag = label.tags[j];
-                if (tagNames.contains(tag.name)) {
+                if (tagNames.isEmpty() || tagNames.contains(tag.name)) {
                     values.add(tag.name, tag.getValue(filter));
                 }
             }
@@ -757,17 +791,21 @@ FetchResult ExcSimProvider::getLabelValues(const String &labelName, const String
     return FetchResult::RowCountError;
 }
 
-FetchResult ExcSimProvider::getTableValues(const String &tableName, const StringArray &columns,
+FetchResult ExcSimProvider::getTableValues(const String &tableName, const StringArray &colNames,
                                            const SqlSelectFilter &filter, DataTable &dataTable) {
     Locker locker(&_tables);
     for (size_t i = 0; i < _tables.count(); i++) {
         const Table &table = _tables[i];
         if (tableName == table.name) {
-            // initial the total count of table.
-            dataTable.setTotalCount(table.rowCount);
-            // initial the columns of table.
-            for (size_t j = 0; j < table.columns.count(); ++j) {
-                const Column &col = table.columns[j];
+            Columns columns;
+            table.getColumns(colNames, columns);
+            if (columns.count() == 0) {
+                return FetchResult::ColumnError;
+            }
+
+            // initial the colNames of table.
+            for (size_t j = 0; j < columns.count(); ++j) {
+                const Column &col = columns[j];
                 DataColumn column(col.name, col.value.typeStr());
                 dataTable.addColumn(column);
             }
@@ -775,17 +813,29 @@ FetchResult ExcSimProvider::getTableValues(const String &tableName, const String
             // add rows.
             int start = table.rowCount < filter.pageSize() ? 0 : filter.offset();
             int next = start + filter.pageSize();
-            int end = table.rowCount < filter.pageSize() ? table.rowCount : (next < table.rowCount ? next
-                                                                                                   : table.rowCount);
+            int end = table.rowCount < filter.pageSize() ?
+                      table.rowCount :
+                      (next < table.rowCount ? next : table.rowCount);
             for (int row = start; row < end; ++row) {
                 DataRow dataRow;
-                for (size_t j = 0; j < table.columns.count(); ++j) {
-                    const Column &col = table.columns[j];
-                    String value = col.getValue(&table, filter, row);
-                    dataRow.addCell(DataCell(dataTable.columns()[col.name], value));
+                bool validRow = true;
+                for (size_t j = 0; j < columns.count(); ++j) {
+                    const Column &col = columns[j];
+                    String value;
+                    if (col.getCellValue(&table, filter, row, value)) {
+                        dataRow.addCell(DataCell(dataTable.columns()[col.name], value));
+                    } else {
+                        validRow = false;
+                    }
                 }
-                dataTable.addRow(dataRow);
+                if (validRow) {
+                    dataTable.addRow(dataRow);
+                }
             }
+
+            // initial the total count of table.
+            dataTable.setTotalCount(Math::min(table.rowCount, (int) dataTable.rowCount()));
+
             return FetchResult::Succeed;
         }
     }
