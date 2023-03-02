@@ -56,7 +56,7 @@ bool TaskService::initialize() {
     if (_timer == nullptr) {
         static const TimeSpan interval = TimeSpan::fromSeconds(1);
         _timer = new Timer("task.timer",
-                           TimerCallback<TaskService>(this, &TaskService::taskTimeUp),
+                           ObjectTimerCallback<TaskService>(this, &TaskService::taskTimeUp),
                            interval, interval);
     }
 

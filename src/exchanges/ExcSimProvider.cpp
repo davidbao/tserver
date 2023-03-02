@@ -836,6 +836,9 @@ FetchResult ExcSimProvider::getTableValues(const String &tableName, const String
             // initial the total count of table.
             dataTable.setTotalCount(Math::min(table.rowCount, (int) dataTable.rowCount()));
 
+            // sort
+            dataTable.sort(filter.orderBy());
+
             return FetchResult::Succeed;
         }
     }
@@ -953,7 +956,7 @@ void ExcSimProvider::startSimulator() {
 
     static const TimeSpan interval = TimeSpan::fromSeconds(1);
     _timer = new Timer("simulator.timer",
-                       TimerCallback<ExcSimProvider>(this, &ExcSimProvider::labelTimeUp),
+                       ObjectTimerCallback<ExcSimProvider>(this, &ExcSimProvider::labelTimeUp),
                        interval, interval);
 }
 

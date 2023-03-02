@@ -57,6 +57,12 @@ set(EXTERNALS_LIB
         ssl${CMAKE_FIND_LIBRARY_SUFFIXES}
         crypto${CMAKE_FIND_LIBRARY_SUFFIXES}
         json${CMAKE_FIND_LIBRARY_SUFFIXES})
+if (NOT WIN_OS)
+    set(EXTERNALS_LIB
+            event_pthreads${CMAKE_FIND_LIBRARY_SUFFIXES}
+            ${EXTERNALS_LIB}
+            )
+endif ()
 
 if (TSERVER_STATIC_STDLIB)
     set(EXTERNALS_LIB ${EXTERNALS_LIB} stdc++${CMAKE_FIND_LIBRARY_SUFFIXES})
