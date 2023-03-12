@@ -22,6 +22,7 @@ include_directories(${CMAKE_SOURCE_DIR}/common-inc)
 include_directories(${CMAKE_SOURCE_DIR}/inc)
 
 # link settings
+# externals path
 if (WIN_OS)
     link_directories(${EXTERNALS_PATH}/install/${OS_NAME}/lib/${CMAKE_VS_PLATFORM_NAME}/${CMAKE_BUILD_TYPE})
     link_directories(${EXTERNALS_PATH}/lib/${OS_NAME}/${CMAKE_VS_PLATFORM_NAME}/${CMAKE_BUILD_TYPE})
@@ -29,7 +30,15 @@ else ()
     link_directories(${EXTERNALS_PATH}/install/${OS_NAME}/lib)
     link_directories(${EXTERNALS_PATH}/lib/${OS_NAME})
 endif ()
-link_directories(${CMAKE_SOURCE_DIR}/common-lib/${CMAKE_BUILD_TYPE}-${OS_NAME})
+
+# common path
+if (WIN_OS)
+    link_directories(${CMAKE_SOURCE_DIR}/common-lib/${OS_NAME}/${CMAKE_VS_PLATFORM_NAME}/${CMAKE_BUILD_TYPE})
+else ()
+    link_directories(${CMAKE_SOURCE_DIR}/common-lib/${OS_NAME}/${CMAKE_BUILD_TYPE})
+endif ()
+
+# inner path
 link_directories(${CMAKE_SOURCE_DIR}/lib)
 
 # lib settings

@@ -10,7 +10,7 @@
 #include "IO/File.h"
 #include "IO/Directory.h"
 #include "diag/Trace.h"
-#include "thread/Process.h"
+#include "diag/Process.h"
 #include "thread/TickTimeout.h"
 #include "TaskContext.h"
 #include "TaskDbProvider.h"
@@ -18,20 +18,20 @@
 
 using namespace Diag;
 
-Action::Action() = default;
+TaskAction::TaskAction() = default;
 
-Action::Action(const String &name) : name(name) {
+TaskAction::TaskAction(const String &name) : name(name) {
 }
 
-Action::Action(const Action &other) {
-    Action::evaluates(other);
+TaskAction::TaskAction(const TaskAction &other) {
+    TaskAction::evaluates(other);
 }
 
-bool Action::equals(const Action &other) const {
+bool TaskAction::equals(const TaskAction &other) const {
     return this->name == other.name;
 }
 
-void Action::evaluates(const Action &other) {
+void TaskAction::evaluates(const TaskAction &other) {
     this->name = other.name;
 }
 

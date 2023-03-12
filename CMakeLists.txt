@@ -84,7 +84,10 @@ if (${CMAKE_BUILD_TYPE} STREQUAL "Debug")
 else (${CMAKE_SYSTEM_NAME} STREQUAL "Release")
 endif ()
 
+# src path.
 add_subdirectory(src)
+
+# test.
 if (TSERVER_ENABLE_TEST)
     enable_testing()
     add_subdirectory(tests)

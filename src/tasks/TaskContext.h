@@ -22,22 +22,22 @@ using namespace Http;
 using namespace Database;
 using namespace System;
 
-class Action : public IEvaluation<Action>, public IEquatable<Action> {
+class TaskAction : public IEvaluation<TaskAction>, public IEquatable<TaskAction> {
 public:
     String name;
 
-    Action();
+    TaskAction();
 
-    explicit Action(const String &name);
+    explicit TaskAction(const String &name);
 
-    Action(const Action &other);
+    TaskAction(const TaskAction &other);
 
-    bool equals(const Action &other) const override;
+    bool equals(const TaskAction &other) const override;
 
-    void evaluates(const Action &other) override;
+    void evaluates(const TaskAction &other) override;
 };
 
-typedef List<Action> Actions;
+typedef List<TaskAction> TaskActions;
 
 class Table;
 
@@ -95,7 +95,7 @@ public:
     String name;
     String app;
     String param;
-    Actions actions;
+    TaskActions actions;
     Tables tables;
 
     explicit Task(const String &path);

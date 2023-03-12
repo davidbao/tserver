@@ -955,9 +955,7 @@ void ExcSimProvider::startSimulator() {
     }
 
     static const TimeSpan interval = TimeSpan::fromSeconds(1);
-    _timer = new Timer("simulator.timer",
-                       ObjectTimerCallback<ExcSimProvider>(this, &ExcSimProvider::labelTimeUp),
-                       interval, interval);
+    _timer = new Timer("simulator.timer", interval, interval, &ExcSimProvider::labelTimeUp, this);
 }
 
 void ExcSimProvider::stopSimulator() {

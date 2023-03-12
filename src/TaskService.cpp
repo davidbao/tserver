@@ -11,7 +11,7 @@
 #include "IO/File.h"
 #include "IO/Directory.h"
 #include "diag/Trace.h"
-#include "thread/Process.h"
+#include "diag/Process.h"
 #include "system/Application.h"
 #include "thread/TickTimeout.h"
 #include "system/Math.h"
@@ -55,9 +55,7 @@ bool TaskService::initialize() {
 
     if (_timer == nullptr) {
         static const TimeSpan interval = TimeSpan::fromSeconds(1);
-        _timer = new Timer("task.timer",
-                           ObjectTimerCallback<TaskService>(this, &TaskService::taskTimeUp),
-                           interval, interval);
+        _timer = new Timer("task.timer", interval, interval, &TaskService::taskTimeUp, this);
     }
 
     return true;
@@ -142,7 +140,7 @@ void TaskService::initTasks() {
                     if (!cs->getProperty(String::format(actionPrefix "name", i, j), actionName)) {
                         break;
                     }
-                    Action action(actionName);
+                    TaskAction action(actionName);
                     task->actions.add(action);
                 }
                 for (int j = 0; j < maxTableCount; j++) {
@@ -589,7 +587,7 @@ bool TaskService::execute(const Task *task) {
 
     bool executed = false;
     for (size_t i = 0; i < task->actions.count(); ++i) {
-        const Action &action = task->actions[i];
+        const TaskAction &action = task->actions[i];
         if (String::equals(action.name, "delete all", true)) {
             ss->deleteAll(task->tables);
             executed = true;
