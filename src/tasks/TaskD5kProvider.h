@@ -13,9 +13,8 @@
 #include "database/SqlSelectFilter.h"
 #include "database/DbClient.h"
 #include "TaskContext.h"
-#include <vector>
 
-#ifdef LINUX_OS
+#ifdef HAS_D5000
 #include "odb_api/odb_tableop.h"
 using namespace ODB;
 #endif
@@ -23,7 +22,7 @@ using namespace ODB;
 using namespace Database;
 using namespace System;
 
-#if defined(MAC_OS) || defined(WIN_OS)
+#ifndef HAS_D5000
 
 class CBuffer {
 public:

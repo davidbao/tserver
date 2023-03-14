@@ -18,8 +18,8 @@ include_directories(${EXTERNALS_PATH}/install/${OS_NAME}/include)
 include_directories(${EXTERNALS_PATH}/install/${OS_NAME}/include/libxml2)
 include_directories(${EXTERNALS_PATH}/install/${OS_NAME}/include/libiconv)
 include_directories(${EXTERNALS_PATH}/include)
-include_directories(${CMAKE_SOURCE_DIR}/common-inc)
 include_directories(${CMAKE_SOURCE_DIR}/inc)
+include_directories(${CMAKE_SOURCE_DIR}/inc/common)
 
 # link settings
 # externals path
@@ -32,10 +32,11 @@ else ()
 endif ()
 
 # common path
+set(COMMON_LIB ${CMAKE_SOURCE_DIR}/lib/common)
 if (WIN_OS)
-    link_directories(${CMAKE_SOURCE_DIR}/common-lib/${OS_NAME}/${CMAKE_VS_PLATFORM_NAME}/${CMAKE_BUILD_TYPE})
+    link_directories(${COMMON_LIB}/${OS_NAME}/${CMAKE_VS_PLATFORM_NAME}/${CMAKE_BUILD_TYPE})
 else ()
-    link_directories(${CMAKE_SOURCE_DIR}/common-lib/${OS_NAME}/${CMAKE_BUILD_TYPE})
+    link_directories(${COMMON_LIB}/${OS_NAME}/${CMAKE_BUILD_TYPE})
 endif ()
 
 # inner path
@@ -49,10 +50,6 @@ elseif (UNIX)
     set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
 endif ()
 set(EXTERNALS_LIB
-        paho-mqtt3a-static${CMAKE_FIND_LIBRARY_SUFFIXES}
-        paho-mqtt3as-static${CMAKE_FIND_LIBRARY_SUFFIXES}
-        paho-mqtt3c-static${CMAKE_FIND_LIBRARY_SUFFIXES}
-        paho-mqtt3cs-static${CMAKE_FIND_LIBRARY_SUFFIXES}
         mysqlclient${CMAKE_FIND_LIBRARY_SUFFIXES}
         sqlite3${CMAKE_FIND_LIBRARY_SUFFIXES}
         event_openssl${CMAKE_FIND_LIBRARY_SUFFIXES}
@@ -65,7 +62,13 @@ set(EXTERNALS_LIB
         z${CMAKE_FIND_LIBRARY_SUFFIXES}
         ssl${CMAKE_FIND_LIBRARY_SUFFIXES}
         crypto${CMAKE_FIND_LIBRARY_SUFFIXES}
-        json${CMAKE_FIND_LIBRARY_SUFFIXES})
+        json${CMAKE_FIND_LIBRARY_SUFFIXES}
+        paho-mqtt3a-static${CMAKE_FIND_LIBRARY_SUFFIXES}
+        paho-mqtt3as-static${CMAKE_FIND_LIBRARY_SUFFIXES}
+        paho-mqtt3c-static${CMAKE_FIND_LIBRARY_SUFFIXES}
+        paho-mqtt3cs-static${CMAKE_FIND_LIBRARY_SUFFIXES}
+        )
+
 if (NOT WIN_OS)
     set(EXTERNALS_LIB
             event_pthreads${CMAKE_FIND_LIBRARY_SUFFIXES}
@@ -105,6 +108,11 @@ if (TSERVER_BUILD_D5000)
     set(TSERVER_LIB ${TSERVER_LIB} odb_apiall_lib)
 endif ()
 #    message(STATUS "TSERVER_LIB: " ${TSERVER_LIB})
+
+# definitions
+if (TSERVER_BUILD_D5000)
+    add_definitions(-DHAS_D5000=1)
+endif ()
 
 # application settings
 set(TSERVER_SRC main)

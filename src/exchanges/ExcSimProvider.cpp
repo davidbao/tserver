@@ -125,9 +125,9 @@ void ExcSimProvider::Tag::runOnce(const Label *label) {
         value = v;
     } else if (String::equals(registerStr, "onoff", true)) {
         if (value.isNullType()) {
-            value = Variant(Variant::Bool);
+            value = Variant(Variant::Integer8);
         }
-        value = !value;
+        value = value == 0 ? 1 : 0;
     } else if (String::equals(registerStr, "uuid", true)) {
         if (value.isNullType()) {
             value = Variant(Variant::Text);
@@ -171,6 +171,8 @@ String ExcSimProvider::Tag::getValue(const SqlSelectFilter &filter) const {
             }
         }
         return String::Empty;
+    } else if (String::equals(registerStr, "incoming", true)) {
+        return filter.getValue(name);
     } else {
         return value.toString();
     }
@@ -352,7 +354,7 @@ ExcSimProvider::Column::Column(const String &name, const String &registerStr, co
                String::equals(registerStr, "cos", true)) {
         this->value = Variant(ValueTypes::Float64);
     } else if (String::equals(registerStr, "onoff", true)) {
-        this->value = Variant(ValueTypes::Bool);
+        this->value = Variant(ValueTypes::Integer8);
     } else {
         double v;
         if (Double::parse(registerStr, v)) {
@@ -448,7 +450,7 @@ bool ExcSimProvider::Column::getCellValue(const Table *table, const SqlSelectFil
         cellValue = Double(v).toString();
     } else if (String::equals(registerStr, "onoff", true)) {
         bool v = (row % 2) == 0;
-        cellValue = Boolean(v).toString();
+        cellValue = Int8(v ? 1 : 0).toString();
     } else if (String::equals(registerStr, "time", true)) {
         Style s;
         if (Style::parse(style, s)) {
@@ -518,6 +520,8 @@ bool ExcSimProvider::Column::getCellValue(const Table *table, const SqlSelectFil
         }
     } else if (String::equals(registerStr, "uuid", true)) {
         cellValue = Uuid::generate().toString();
+    } else if (String::equals(registerStr, "incoming", true)) {
+        cellValue = filter.getValue(name);
     } else {
         cellValue = registerStr;
     }
@@ -553,7 +557,7 @@ bool ExcSimProvider::Column::parseDoubleStyle(const String &style, double &minVa
 
     Style s;
     if (Style::parse(style, s)) {
-        String rangeStr = String::trim(s["rangeStr"], '\'', '"', ' ');
+        String rangeStr = String::trim(s["range"], '\'', '"', ' ');
         StringArray ranges;
         StringArray::parse(rangeStr, ranges, '-');
         if (ranges.count() == 2) {
