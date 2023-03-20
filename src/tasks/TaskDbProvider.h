@@ -24,10 +24,11 @@ public:
 
     ~TaskDbProvider() override;
 
-    bool getValue(const Table &table, DataTable &t) override;
+    bool getValue(const Column &column, DbValue &value) override;
 
-private:
-    bool getValue(const Columns &columns, DataTable &t);
+    bool getValue(const Table &table, DataTable &dataTable) override;
+
+    bool getValue(const Style &value, Variable::Values &values) override;
 
 private:
     DbClient *_dbClient;

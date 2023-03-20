@@ -22,11 +22,13 @@ using namespace Data;
 using namespace Config;
 using namespace Database;
 
-class TaskService : public IConfigService, public ITaskExecution {
+class TaskService : public IConfigService, public ITaskProviders {
 public:
     TaskService();
 
     ~TaskService() override;
+
+    ITaskProvider *getProvider(const String &dsName) const override;
 
     bool initialize();
 
@@ -45,9 +47,6 @@ public:
 
     bool updateTask(const StringMap &request, StringMap &response);
 
-    // for ITaskExecution
-    bool execute(const Task *task) override;
-
 private:
     void initTasks();
 
@@ -65,7 +64,12 @@ private:
 
     void initDataSources();
 
-    ITaskProvider *getProvider(const String &dsName) const;
+//    bool getValue(const TaskAction &action, const Variables &vars, const Table &table, DataTable &dataTable);
+//
+//    void updateVars(const Task *task, Variables &vars) const;
+//
+//    void addRow(DataTable &dataTable, const TaskAction &action,
+//                const Columns &columns, const Variable &var = Variable::Empty) const;
 
 private:
     static String getAppPath();
@@ -77,14 +81,20 @@ private:
 private:
 #define maxTaskCount 1000
 #define taskPrefix "tasks[%d]."
+#define schedulePrefix "tasks[%d].schedule."
+#define executionPrefix "tasks[%d].execution."
+
+#define maxVarCount 100
+#define varPrefix executionPrefix "vars[%d]."
+
 #define maxActionCount 100
-#define actionPrefix taskPrefix "actions[%d]."
+#define actionPrefix executionPrefix "actions[%d]."
 
 #define maxDataSourceCount 1000
 #define dataSourcePrefix "datasource[%d]."
 
 #define maxTableCount 1000
-#define tablePrefix taskPrefix "tables[%d]."
+#define tablePrefix executionPrefix "tables[%d]."
 #define maxColumnCount 100
 #define columnPrefix tablePrefix "columns[%d]."
 

@@ -1,0 +1,622 @@
+datasource:
+  - name: db1
+    type: Database
+    username: SYSTEM
+    password: MANAGER
+    url: kingbase://192.166.1.19:54321/EMS
+  - name: rtdb
+    type: D5000
+    appNo: 1
+    
+tasks:
+  # 首页
+  - name: home_total
+    type: cycle
+    interval: 00:01:00
+    actions:
+      - name: delete all
+      - name: insert
+    tables:
+      - name: TSERVER.home_total
+        enable: true
+        style: "datasource: rtdb; tableNo: 301; contextNo: 0"
+        columns:
+          - name: id
+            type: int64
+            pkey: true
+            register: SnowFlake
+          - name: p_s_capacity
+            register: 32
+            type: float
+          - name: p_power
+            register: 45
+            type: int
+          - name: p_p_capacity
+            register: rtdb
+            type: int
+            style: "datasource: rtdb; tableNo: 302; contextNo: 0; sql: SELECT opera_state_qual FROM batteryunit WHERE psid=1734524036022534145; type: int"
+          - name: p_a_capacity
+            register: rtdb
+            type: int
+            style: "sql: SELECT opera_mode FROM batteryunit WHERE psid=1734524036022534145; type: int"
+          - name: p_max_load
+            register: rtdb
+            type: float
+            style: "sql: SELECT opera_mode_qual FROM batteryunit WHERE psid=1734524036022534145; type: float"
+          - name: d_s_capacity
+            register: rtdb          
+            type: float
+            style: "sql: SELECT u_toal FROM batteryunit WHERE psid=1734524036022534145; type: float"
+          - name: d_power
+            register: rtdb
+            type: int
+            style: "sql: SELECT u_toal_qual FROM batteryunit WHERE psid=1734524036022534145; type: int"
+          - name: d_p_capacity
+            register: rtdb          
+            type: int
+            style: "sql: SELECT i_toal FROM batteryunit WHERE psid=1734524036022534145; type: int"
+          - name: d_a_capacity
+            register: rtdb          
+            type: int
+            style: "sql: SELECT i_toal_qual FROM batteryunit WHERE psid=1734524036022534145; type: int"
+          - name: d_max_load
+            register: rtdb          
+            type: float
+            style: "sql: SELECT soc FROM batteryunit WHERE psid=1734524036022534145; type: float"
+          - name: day_epencent
+            register: rtdb          
+            type: float
+            style: "sql: SELECT soc_qual FROM batteryunit WHERE psid=1734524036022534145; type: float"
+          - name: total_income
+            register: rtdb          
+            type: float
+            style: "sql: SELECT soe FROM batteryunit WHERE psid=1734524036022534145; type: float"
+          - name: day_vroc
+            register: rtdb          
+            type: float
+            style: "sql: SELECT soe_qual FROM batteryunit WHERE psid=1734524036022534145; type: long"
+          - name: total_p_income
+            register: rtdb          
+            type: float
+            style: "sql: SELECT soh FROM batteryunit WHERE psid=1734524036022534145; type: float"
+  - name: home_p_dload_power
+    type: time
+    time: 00:00:00
+    repeat:
+      type: day
+    actions:
+      - name: delete all
+    tables:
+      - name: TSERVER.home_p_dload_power
+        enable: true
+  - name: home_p_dload_power
+    type: time
+    time: 00:00:00
+    repeat:
+      type: hour
+    actions:
+      - name: insert
+    tables:
+      - name: TSERVER.home_p_dload_power
+        enable: true
+        columns:
+          - name: id
+            type: int64
+            pkey: true
+            register: SnowFlake
+          - name: time
+            register: now
+            type: time
+            style: "format: 'HH:mm'"
+          - name: value
+            register: rtdb
+            type: float
+            style: "datasource: rtdb; tableNo: 302; contextNo: 0; sql: SELECT opera_state_qual FROM batteryunit WHERE psid=1734524036022534145; type: int"
+  # 光储联动台区-储能运行状态
+  - name: p_seoverview_acdata
+    type: cycle
+    interval: 00:01:00
+    actions:
+      - name: delete all
+      - name: insert
+    tables:
+      - name: TSERVER.p_seoverview_acdata
+        enable: true
+        style: "datasource: rtdb; tableNo: 301; contextNo: 0"
+        columns:
+          - name: id
+            type: int64
+            pkey: true
+            register: SnowFlake
+          - name: P
+            type: float
+            style: "sql: SELECT P FROM batteryunit WHERE psid=1734524036022534145; type: float"
+          - name: Q
+            type: float
+            style: "sql: SELECT Q FROM batteryunit WHERE psid=1734524036022534145; type: float"
+          - name: Ia
+            type: float
+            style: "sql: SELECT Ia FROM batteryunit WHERE psid=1734524036022534145; type: float"
+          - name: Ib
+            type: float
+            style: "sql: SELECT Ib FROM batteryunit WHERE psid=1734524036022534145; type: float"
+          - name: Ic
+            type: float
+            style: "sql: SELECT Ic FROM batteryunit WHERE psid=1734524036022534145; type: float"
+          - name: Ua
+            type: float
+            style: "sql: SELECT Ua FROM batteryunit WHERE psid=1734524036022534145; type: float"
+          - name: Ub
+            type: float
+            style: "sql: SELECT Ub FROM batteryunit WHERE psid=1734524036022534145; type: float"
+          - name: Uc
+            type: float
+            style: "sql: SELECT Uc FROM batteryunit WHERE psid=1734524036022534145; type: float"
+          - name: PCS_comm_error
+            type: int
+            style: "sql: SELECT opera_mode FROM batteryunit WHERE psid=1734524036022534145; type: int"
+          - name: PCS_ctrl_fail
+            type: int
+            style: "sql: SELECT opera_mode FROM batteryunit WHERE psid=1734524036022534145; type: int"
+          - name: EMS_comm_error
+            type: int
+            style: "sql: SELECT opera_mode FROM batteryunit WHERE psid=1734524036022534145; type: int"
+          - name: rack_vdiff_high
+            type: int
+            style: "sql: SELECT opera_mode FROM batteryunit WHERE psid=1734524036022534145; type: int"
+          - name: rack_cdiff_high
+            type: int
+            style: "sql: SELECT opera_mode FROM batteryunit WHERE psid=1734524036022534145; type: int"
+          - name: em_shutdown
+            type: int
+            style: "sql: SELECT opera_mode FROM batteryunit WHERE psid=1734524036022534145; type: int"
+          - name: ac_comm_error
+            type: int
+            style: "sql: SELECT opera_mode FROM batteryunit WHERE psid=1734524036022534145; type: int"
+          - name: overv_3rd_level
+            type: int
+            style: "sql: SELECT opera_mode FROM batteryunit WHERE psid=1734524036022534145; type: int"
+  - name: p_seoverview_accurve
+    type: time
+    time: 00:00:00
+    repeat:
+      type: day
+    actions:
+      - name: delete all
+    tables:
+      - name: TSERVER.p_seoverview_accurve
+        enable: true
+  - name: p_seoverview_accurve
+    type: time
+    time: 00:00:00
+    repeat:
+      type: hour
+    actions:
+      - name: insert
+    tables:
+      - name: TSERVER.p_seoverview_accurve
+        enable: true
+        style: "datasource: rtdb; tableNo: 301; contextNo: 0"
+        columns:
+          - name: id
+            type: int64
+            pkey: true
+            register: SnowFlake
+          - name: time
+            register: now
+            type: time
+            style: "format: 'yyyy-MM-dd HH:mm'"
+          - name: P
+            register: rtdb
+            type: float
+            style: "sql: SELECT P FROM batteryunit WHERE psid=1734524036022534145; type: float"
+          - name: Q
+            register: rtdb
+            type: float
+            style: "sql: SELECT Q FROM batteryunit WHERE psid=1734524036022534145; type: float"
+          - name: Ia
+            register: rtdb
+            type: float
+            style: "sql: SELECT Ia FROM batteryunit WHERE psid=1734524036022534145; type: float"
+          - name: Ib
+            register: rtdb
+            type: float
+            style: "sql: SELECT Ib FROM batteryunit WHERE psid=1734524036022534145; type: float"
+          - name: Ic
+            register: rtdb
+            type: float
+            style: "sql: SELECT Ic FROM batteryunit WHERE psid=1734524036022534145; type: float"
+          - name: Ua
+            register: rtdb
+            type: float
+            style: "sql: SELECT Ua FROM batteryunit WHERE psid=1734524036022534145; type: float"
+          - name: Ub
+            register: rtdb
+            type: float
+            style: "sql: SELECT Ub FROM batteryunit WHERE psid=1734524036022534145; type: float"
+          - name: Uc
+            register: rtdb
+            type: float
+            style: "sql: SELECT Uc FROM batteryunit WHERE psid=1734524036022534145; type: float"
+  - name: p_seoverview_dcdata
+    type: cycle
+    interval: 00:01:00
+    actions:
+      - name: delete all
+      - name: insert
+    tables:
+      - name: TSERVER.p_seoverview_acdata
+        enable: true
+        style: "datasource: rtdb; tableNo: 301; contextNo: 0"
+        columns:
+          - name: id
+            type: int64
+            pkey: true
+            register: SnowFlake
+          - name: P
+            type: float
+            style: "sql: SELECT P FROM batteryunit WHERE psid=1734524036022534145; type: float"
+          - name: I
+            type: float
+            style: "sql: SELECT I FROM batteryunit WHERE psid=1734524036022534145; type: float"
+          - name: U
+            type: float
+            style: "sql: SELECT U FROM batteryunit WHERE psid=1734524036022534145; type: float"
+          - name: bc1_I
+            type: int
+            style: "sql: SELECT P FROM batteryunit WHERE psid=1734524036022534145; type: int"
+          - name: bc1_U
+            type: int
+            style: "sql: SELECT P FROM batteryunit WHERE psid=1734524036022534145; type: int"
+          - name: bc1_soc
+            type: int
+            style: "sql: SELECT P FROM batteryunit WHERE psid=1734524036022534145; type: int"
+          - name: bc1_soh
+            type: int
+            style: "sql: SELECT P FROM batteryunit WHERE psid=1734524036022534145; type: int"
+          - name: bc2_I
+            type: int
+            style: "sql: SELECT P FROM batteryunit WHERE psid=1734524036022534145; type: int"
+          - name: bc2_U
+            type: int
+            style: "sql: SELECT P FROM batteryunit WHERE psid=1734524036022534145; type: int"
+          - name: bc2_soc
+            type: int
+            style: "sql: SELECT P FROM batteryunit WHERE psid=1734524036022534145; type: int"
+          - name: bc2_soh
+            type: int
+            style: "sql: SELECT P FROM batteryunit WHERE psid=1734524036022534145; type: int"
+          - name: bc3_I
+            type: int
+            style: "sql: SELECT P FROM batteryunit WHERE psid=1734524036022534145; type: int"
+          - name: bc3_U
+            type: int
+            style: "sql: SELECT P FROM batteryunit WHERE psid=1734524036022534145; type: int"
+          - name: bc3_soc
+            type: int
+            style: "sql: SELECT P FROM batteryunit WHERE psid=1734524036022534145; type: int"
+          - name: bc3_soh
+            type: int
+            style: "sql: SELECT P FROM batteryunit WHERE psid=1734524036022534145; type: int"
+          - name: bc4_I
+            type: int
+            style: "sql: SELECT P FROM batteryunit WHERE psid=1734524036022534145; type: int"
+          - name: bc4_U
+            type: int
+            style: "sql: SELECT P FROM batteryunit WHERE psid=1734524036022534145; type: int"
+          - name: bc4_soc
+            type: int
+            style: "sql: SELECT P FROM batteryunit WHERE psid=1734524036022534145; type: int"
+          - name: bc4_soh
+            type: int
+            style: "sql: SELECT P FROM batteryunit WHERE psid=1734524036022534145; type: int"
+          - name: PCS_comm_error
+            type: int
+            style: "sql: SELECT P FROM batteryunit WHERE psid=1734524036022534145; type: int"
+          - name: PCS_ctrl_fail
+            type: int
+            style: "sql: SELECT P FROM batteryunit WHERE psid=1734524036022534145; type: int"
+          - name: EMS_comm_error
+            type: int
+            style: "sql: SELECT P FROM batteryunit WHERE psid=1734524036022534145; type: int"
+          - name: rack_vdiff_high
+            type: int
+            style: "sql: SELECT P FROM batteryunit WHERE psid=1734524036022534145; type: int"
+          - name: rack_cdiff_high
+            type: int
+            style: "sql: SELECT P FROM batteryunit WHERE psid=1734524036022534145; type: int"
+          - name: em_shutdown
+            type: int
+            style: "sql: SELECT P FROM batteryunit WHERE psid=1734524036022534145; type: int"
+          - name: ac_comm_error
+            type: int
+            style: "sql: SELECT P FROM batteryunit WHERE psid=1734524036022534145; type: int"
+          - name: overv_3rd_level
+            type: int
+            style: "sql: SELECT P FROM batteryunit WHERE psid=1734524036022534145; type: int"
+  - name: p_seoverview_dccurve
+    type: time
+    time: 00:00:00
+    repeat:
+      type: day
+    actions:
+      - name: delete all
+    tables:
+      - name: TSERVER.p_seoverview_dccurve
+        enable: true
+  - name: p_seoverview_dccurve
+    type: time
+    time: 00:00:00
+    repeat:
+      type: hour
+    actions:
+      - name: insert
+    tables:
+      - name: TSERVER.p_seoverview_dccurve
+        enable: true
+        style: "datasource: rtdb; tableNo: 301; contextNo: 0"
+        columns:
+          - name: id
+            type: int64
+            pkey: true
+            register: SnowFlake
+          - name: time
+            register: now
+            type: time
+            style: "format: 'yyyy-MM-dd HH:mm'"
+          - name: P
+            register: rtdb
+            type: float
+            style: "sql: SELECT P FROM batteryunit WHERE psid=1734524036022534145; type: float"
+          - name: I
+            register: rtdb
+            type: float
+            style: "sql: SELECT I FROM batteryunit WHERE psid=1734524036022534145; type: float"
+          - name: U
+            register: rtdb
+            type: float
+            style: "sql: SELECT U FROM batteryunit WHERE psid=1734524036022534145; type: float"
+  # 光储联动台区-光伏运行状态
+  - name: p_poverview_station
+    type: cycle
+    interval: 00:01:00
+    actions:
+      - name: delete all
+      - name: insert
+    tables:
+      - name: TSERVER.p_poverview_station
+        enable: true
+        register: database
+        style: "datasource: db1; sql: SELECT * FROM xxx WHERE pid=111"
+        columns:
+          - name: id
+            type: int64
+            pkey: true
+            register: SnowFlake
+          - name: pid
+            type: int
+          - name: name
+            type: text
+  - name: d_poverview_overview
+    type: cycle
+    interval: 00:01:00
+    vars:
+      - name: pid
+        value: "datasource: db1; sql: SELECT pid FROM TSERVER.d_poverview_station"
+    actions:
+      - name: delete
+        style: "where: pid=$pid"
+      - name: insert
+        style: "where: pid=$pid"
+    tables:
+      - name: TSERVER.d_poverview_overview
+        enable: true
+        style: "datasource: rtdb; tableNo: 302; contextNo: 0"
+        columns:
+          - name: id
+            type: int64
+            pkey: true
+            register: SnowFlake
+          - name: pid
+            type: int
+            register: $pid
+          - name: capacity
+            register: rtdb
+            type: float
+            style: "sql: SELECT capacity FROM batteryunit; type: float"
+          - name: power
+            register: rtdb          
+            type: float
+            style: "sql: SELECT power FROM batteryunit; type: float"
+          - name: max_power
+            register: rtdb          
+            type: float
+            style: "sql: SELECT max_power FROM batteryunit; type: float"
+          - name: min_power
+            register: rtdb          
+            type: float
+            style: "sql: SELECT min_power FROM batteryunit; type: float"
+          - name: daily_EP
+            register: rtdb          
+            type: float
+            style: "sql: SELECT daily_EP FROM batteryunit; type: float"
+  - name: p_poverview_mesa
+    type: cycle
+    interval: 00:01:00
+    vars:
+      - name: pid
+        value: "datasource: db1; sql: SELECT pid FROM TSERVER.d_poverview_station"
+    actions:
+      - name: delete
+        style: "where: pid=$pid"
+      - name: insert
+        style: "where: pid=$pid"
+    tables:
+      - name: TSERVER.p_poverview_mesa
+        enable: true
+        style: "datasource: rtdb; tableNo: 302; contextNo: 0"
+        columns:
+          - name: id
+            type: int64
+            pkey: true
+            register: SnowFlake
+          - name: pid
+            type: int
+            register: $pid
+          - name: P
+            register: rtdb
+            type: float
+            style: "sql: SELECT P FROM batteryunit WHERE psid=1734524036022534145; type: float"
+          - name: Q
+            register: rtdb
+            type: float
+            style: "sql: SELECT Q FROM batteryunit WHERE psid=1734524036022534145; type: float"
+          - name: Ia
+            register: rtdb
+            type: float
+            style: "sql: SELECT Ia FROM batteryunit WHERE psid=1734524036022534145; type: float"
+          - name: Ib
+            register: rtdb
+            type: float
+            style: "sql: SELECT Ib FROM batteryunit WHERE psid=1734524036022534145; type: float"
+          - name: Ic
+            register: rtdb
+            type: float
+            style: "sql: SELECT Ic FROM batteryunit WHERE psid=1734524036022534145; type: float"
+          - name: Ua
+            register: rtdb
+            type: float
+            style: "sql: SELECT Ua FROM batteryunit WHERE psid=1734524036022534145; type: float"
+          - name: Ub
+            register: rtdb
+            type: float
+            style: "sql: SELECT Ub FROM batteryunit WHERE psid=1734524036022534145; type: float"
+          - name: Uc
+            register: rtdb
+            type: float
+            style: "sql: SELECT Uc FROM batteryunit WHERE psid=1734524036022534145; type: float"
+  - name: p_poverview_protect
+    type: cycle
+    interval: 00:01:00
+    vars:
+      - name: pid
+        value: "datasource: db1; sql: SELECT pid FROM TSERVER.d_poverview_station"
+    actions:
+      - name: delete
+        style: "where: pid=$pid"
+      - name: insert
+        style: "where: pid=$pid"
+    tables:
+      - name: TSERVER.p_poverview_protect
+        enable: true
+        style: "datasource: rtdb; tableNo: 302; contextNo: 0"
+        columns:
+          - name: id
+            type: int64
+            pkey: true
+            register: SnowFlake
+          - name: pid
+            type: int
+            register: $pid
+          - name: lcl
+            register: rtdb
+            type: int
+            style: "sql: SELECT P FROM batteryunit WHERE psid=1734524036022534145; type: int"
+          - name: prot_act
+            register: rtdb
+            type: int
+            style: "sql: SELECT P FROM batteryunit WHERE psid=1734524036022534145; type: int"
+          - name: ocswitch_act
+            register: rtdb
+            type: int
+            style: "sql: SELECT P FROM batteryunit WHERE psid=1734524036022534145; type: int"
+          - name: interval_exception
+            register: rtdb
+            type: int
+            style: "sql: SELECT P FROM batteryunit WHERE psid=1734524036022534145; type: int"
+          - name: interval_fail
+            register: rtdb
+            type: int
+            style: "sql: SELECT P FROM batteryunit WHERE psid=1734524036022534145; type: int"
+          - name: interval_singal
+            register: rtdb
+            type: int
+            style: "sql: SELECT P FROM batteryunit WHERE psid=1734524036022534145; type: int"
+          - name: mp_comm_error
+            register: rtdb
+            type: int
+            style: "sql: SELECT P FROM batteryunit WHERE psid=1734524036022534145; type: int"
+          - name: bh_position
+            register: rtdb
+            type: int
+            style: "sql: SELECT P FROM batteryunit WHERE psid=1734524036022534145; type: int"
+  - name: p_poverview_curve
+    type: time
+    time: 00:00:00
+    repeat:
+      type: hour
+    actions:
+      - name: insert
+    tables:
+      - name: TSERVER.p_poverview_curve
+        enable: true
+        style: "datasource: rtdb; tableNo: 301; contextNo: 0"
+        columns:
+          - name: id
+            type: int64
+            pkey: true
+            register: SnowFlake
+          - name: time
+            register: now
+            type: time
+            style: "format: 'yyyy-MM-dd HH:mm'"
+          - name: P
+            type: float
+            style: "sql: SELECT P FROM batteryunit WHERE psid=1734524036022534145; type: float"
+          - name: Q
+            type: float
+            style: "sql: SELECT Q FROM batteryunit WHERE psid=1734524036022534145; type: float"
+          - name: Ia
+            type: float
+            style: "sql: SELECT Ia FROM batteryunit WHERE psid=1734524036022534145; type: float"
+          - name: Ib
+            type: float
+            style: "sql: SELECT Ib FROM batteryunit WHERE psid=1734524036022534145; type: float"
+          - name: Ic
+            type: float
+            style: "sql: SELECT Ic FROM batteryunit WHERE psid=1734524036022534145; type: float"
+          - name: Ua
+            type: float
+            style: "sql: SELECT Ua FROM batteryunit WHERE psid=1734524036022534145; type: float"
+          - name: Ub
+            type: float
+            style: "sql: SELECT Ub FROM batteryunit WHERE psid=1734524036022534145; type: float"
+          - name: Uc
+            type: float
+            style: "sql: SELECT Uc FROM batteryunit WHERE psid=1734524036022534145; type: float"
+  - name: p_poverview_curve_c
+    type: time
+    time: 00:00:00
+    repeat:
+      type: day
+    vars:
+      - name: hour
+        value: 0-23
+    actions:
+      - name: insert
+    tables:
+      - name: TSERVER.p_poverview_curve_c
+        enable: true
+        register: database
+        style: "datasource: db1; sql: SELECT AVG(P) P FROM TSERVER.p_poverview_curve WHERE 
+        time>=(SELECT CONCAT(DATE_FORMAT(DATEADD('day', -7, CURRENT_DATE), '%Y-%m-%d'), ' 00:00:00')) AND
+         time<=(SELECT CONCAT(DATE_FORMAT(DATEADD('day', -7, CURRENT_DATE), '%Y-%m-%d'), ' 23:59:59')) AND DATE_FORMAT(time, '%H')=$hour"
+        columns:
+          - name: id
+            type: int64
+            pkey: true
+            register: SnowFlake
+          - name: time
+            type: time
+          - name: P
+            type: float

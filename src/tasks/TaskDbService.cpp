@@ -42,7 +42,7 @@ DbClient *TaskDbService::dbClient() const {
     return dbClient;
 }
 
-bool TaskDbService::deleteAll(const Tables &tables) {
+bool TaskDbService::deleteRecords(const Tables &tables) {
     if (tables.count() == 0) {
         return false;
     }
@@ -55,48 +55,70 @@ bool TaskDbService::deleteAll(const Tables &tables) {
             sql.appendLine(String::format("DELETE FROM %s;", table.name.c_str()));
         }
 #ifdef DEBUG
-        createSqlFile("deleteAll.sql", sql);
+        createSqlFile("deleteRecords.sql", sql);
 #endif
         return dbClient->executeSql(sql);
     }
     return false;
 }
 
-bool TaskDbService::insert(const Table &table, const DataTable &dataTable) {
-    if (table.columns.count() == 0) {
+bool TaskDbService::deleteRecords(const TaskAction &action, const Variables &vars, const Tables &tables) {
+    if (action.style.isEmpty()) {
+        return deleteRecords(tables);
+    } else {
+        if (tables.count() == 0) {
+            return false;
+        }
+
+        DbClient *dbClient = this->dbClient();
+        if (dbClient != nullptr) {
+            String sql;
+            for (size_t i = 0; i < tables.count(); i++) {
+                const Table &table = tables[i];
+                const String where = action.style["where"];
+                if (!where.isNullOrEmpty()) {
+                    for (size_t j = 0; j < vars.count(); ++j) {
+                        const Variable &var = vars[j];
+                        const String &name = var.name;
+                        String varName = String::format("$%s", name.c_str());
+                        if (where.find(varName) > 0) {
+                            const Variable::Values &values = var.values();
+                            for (size_t k = 0; k < values.count(); ++k) {
+                                String whereStr = String::replace(where, varName, values.at(k).toString());
+                                sql.appendLine(String::format("DELETE FROM %s WHERE %s;",
+                                                              table.name.c_str(), whereStr.c_str()));
+                            }
+                        }
+                    }
+                } else {
+                    sql.appendLine(String::format("DELETE FROM %s;", table.name.c_str()));
+                }
+            }
+#ifdef DEBUG
+            createSqlFile("deleteRecords.sql", sql);
+#endif
+            return dbClient->executeSql(sql);
+        }
         return false;
     }
+}
+
+bool TaskDbService::insert(const DataTable &dataTable) {
     if (dataTable.rowCount() == 0) {
         return false;
     }
 
     DbClient *dbClient = this->dbClient();
     if (dbClient != nullptr) {
-        DataTable t(table.name);
-        t.addColumns(table.columns.toColumns());
+        return dbClient->executeSqlInsert(dataTable);
+    }
+    return false;
+}
 
-        for (size_t i = 0; i < dataTable.rowCount(); ++i) {
-            DataRow r;
-            const DataRow &row = dataTable.rows()[i];
-            for (size_t j = 0; j < t.columnCount(); ++j) {
-                const DataColumn &c = t.columns()[j];
-                Column column;
-                if (table.columns.getColumn(c.name(), column)) {
-                    if (String::equals(column.registerStr, "SnowFlake", true)) {
-                        r.addCell(DataCell(c, DbClient::generateSnowFlakeId()));
-                    } else if (String::equals(column.registerStr, "Uuid", true)) {
-                        r.addCell(DataCell(c, Uuid::generate().toString()));
-                    } else {
-                        const DataCell &cell = row.cells().at(c.name());
-                        if (!cell.isNullValue()) {
-                            r.addCell(DataCell(c, cell.value()));
-                        }
-                    }
-                }
-            }
-            t.addRow(r);
-        }
-        return dbClient->executeSqlInsert(t);
+bool TaskDbService::executeSql(const String &sql) {
+    DbClient *dbClient = this->dbClient();
+    if (dbClient != nullptr) {
+        return dbClient->executeSql(sql);
     }
     return false;
 }

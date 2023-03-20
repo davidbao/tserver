@@ -27,9 +27,13 @@ public:
 
     bool unInitialize();
 
-    bool deleteAll(const Tables &tables);
+    bool deleteRecords(const Tables &tables);
 
-    bool insert(const Table &table, const DataTable &dataTable);
+    bool deleteRecords(const TaskAction &action, const Variables &vars, const Tables &tables);
+
+    bool insert(const DataTable &dataTable);
+
+    bool executeSql(const String &sql);
 
 private:
     DbClient *dbClient() const;

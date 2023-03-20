@@ -81,10 +81,14 @@ public:
 
     ~TaskD5kProvider() override;
 
-    bool getValue(const Table &table, DataTable &t) override;
+    bool getValue(const Column &column, DbValue &value) override;
+
+    bool getValue(const Table &table, DataTable &dataTable) override;
+
+    bool getValue(const Style &value, Variable::Values &values) override;
 
 private:
-    static DbValue getValue(const CBuffer &buffer, const String &type);
+    static bool getValue(const CBuffer &buffer, const String &type, DbValue &value);
 };
 
 #endif //TSERVER_TASKD5KPROVIDER_H

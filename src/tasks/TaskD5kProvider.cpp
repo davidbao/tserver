@@ -19,71 +19,66 @@ TaskD5kProvider::TaskD5kProvider(const D5kSource *ds) : ITaskProvider(ds) {
 
 TaskD5kProvider::~TaskD5kProvider() = default;
 
-bool TaskD5kProvider::getValue(const Table &table, DataTable &t) {
+bool TaskD5kProvider::getValue(const Column &column, DbValue &value) {
     auto ds = dynamic_cast<const D5kSource *>(_dataSource);
     int tableNo, contextNo;
-    if (D5kSource::parseTableStyle(table.style, tableNo, contextNo)) {
+    if (D5kSource::parseTableStyle(column.style, tableNo, contextNo)) {
         CTableOp tableOp;
         int result = tableOp.Open(ds->appNo, tableNo, (short) contextNo);
         if (result < 0) {
+            Trace::error(String::format("Can not open table! appNo: %d, contextNo: %d", tableNo, contextNo));
             return false;
         }
 
-        t.addColumns(table.columns.toColumns());
-
-        DataRow row;
-        for (size_t j = 0; j < t.columnCount(); ++j) {
-            const DataColumn &c = t.columns()[j];
-            Column column;
-            if (table.columns.getColumn(c.name(), column)) {
-                String type, sql;
-                if (D5kSource::parseColumnStyle(column.style, type, sql)) {
-                    CBuffer buffer;
-#ifdef MAC_OS
-                    DbValue value(DbValue::fromTypeStr(type), Random::getRandValue(1, 100));
-                    buffer.setValue(value);
+        String type, sql;
+        if (D5kSource::parseColumnStyle(column.style, type, sql)) {
+            CBuffer buffer;
+#ifndef HAS_D5000
+            buffer.setValue(DbValue(DbValue::fromTypeStr(type), Random::getRandValue(1, 100)));
 #endif
-                    result = tableOp.SqlGet(sql, buffer);
-                    if (result >= 0) {
-                        row.addCell(DataCell(c, getValue(buffer, type)));
-                    }
-                } else {
-                    if (!column.style.isEmpty()) {
-                        Trace::error(
-                                String::format("Can not parse column style! name: %s", column.name.c_str()));
-                    }
-                }
+            result = tableOp.SqlGet(sql, buffer);
+            if (result >= 0) {
+                return getValue(buffer, type, value);
             }
-        }
-        if (row.cellCount() > 0) {
-            t.addRow(row);
-            return true;
+        } else {
+            Trace::error(String::format("Can not parse style! column name: %s", column.name.c_str()));
         }
     } else {
-        if (!table.style.isEmpty()) {
-            Trace::error(String::format("Can not parse table style! name: %s", table.name.c_str()));
-        }
+        Trace::error(String::format("Can not parse style! column name: %s", column.name.c_str()));
     }
     return false;
 }
 
-DbValue TaskD5kProvider::getValue(const CBuffer &buffer, const String &type) {
+bool TaskD5kProvider::getValue(const Table &table, DataTable &dataTable) {
+    return false;
+}
+
+bool TaskD5kProvider::getValue(const Style &value, Variable::Values &values) {
+    return false;
+}
+
+bool TaskD5kProvider::getValue(const CBuffer &buffer, const String &type, DbValue &value) {
     if (buffer.GetLength() > 0) {
         DbValue::Type t = DbValue::fromTypeStr(type);
         auto v = (const D5kValue *) buffer.GetBufPtr();
         if (String::equals(type, "int", true)) {
-            return DbValue(t, v->nValue);
+            value = DbValue(t, v->nValue);
+            return true;
         } else if (String::equals(type, "long", true)) {
-            return DbValue(t, v->lValue);
+            value = DbValue(t, v->lValue);
+            return true;
         } else if (String::equals(type, "float", true)) {
-            return DbValue(t, v->fValue);
+            value = DbValue(t, v->fValue);
+            return true;
         } else if (String::equals(type, "uchar", true)) {
-            return DbValue(t, v->ucValue);
+            value = DbValue(t, v->ucValue);
+            return true;
         } else if (String::equals(type, "string", true) ||
                    String::equals(type, "vstring", true) ||
                    String::equals(type, "varchar", true)) {
-            return DbValue(t, v->strValue);
+            value = DbValue(t, v->strValue);
+            return true;
         }
     }
-    return DbValue::NullValue;
+    return false;
 }

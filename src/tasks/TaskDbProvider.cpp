@@ -23,45 +23,66 @@ TaskDbProvider::~TaskDbProvider() {
     }
 }
 
-bool TaskDbProvider::getValue(const Table &table, DataTable &t) {
-    if (_dbClient != nullptr) {
-        const String &sql = table.style["sql"];
-        if (!sql.isNullOrEmpty()) {
-            return _dbClient->executeSqlQuery(sql, t);
-        } else {
-            return getValue(table.columns, t);
-        }
+bool TaskDbProvider::getValue(const Column &column, DbValue &value) {
+    if (_dbClient == nullptr) {
+        return false;
+    }
+
+    const String &sql = column.style["sql"];
+    DataTable dataTable;
+    if (_dbClient->executeSqlQuery(sql, dataTable) &&
+        dataTable.columnCount() == 1 && dataTable.rowCount() == 1) {
+        const DataCell &cell = dataTable.rows()[0].cells()[0];
+        value = cell.value();
+        return true;
     }
     return false;
 }
 
-bool TaskDbProvider::getValue(const Columns &columns, DataTable &t) {
-    t.addColumns(columns.toColumns());
+bool TaskDbProvider::getValue(const Table &table, DataTable &dataTable) {
+    if (_dbClient == nullptr) {
+        return false;
+    }
 
-    DataRow row;
-    for (size_t i = 0; i < t.columnCount(); ++i) {
-        const DataColumn &c = t.columns()[i];
-        Column column;
-        if (columns.getColumn(c.name(), column)) {
-            if (String::equals(column.registerStr, "SnowFlake", true)) {
-                row.addCell(DataCell(c, DbClient::generateSnowFlakeId()));
-            } else if (String::equals(column.registerStr, "Uuid", true)) {
-                row.addCell(DataCell(c, Uuid::generate().toString()));
-            } else {
-                const String &sql = column.style["sql"];
-                DataTable dataTable;
-                if (_dbClient->executeSqlQuery(sql, dataTable) &&
-                    dataTable.columnCount() == 1 && dataTable.rowCount() == 1) {
-                    const DataCell &cell = dataTable.rows()[0].cells()[0];
-                    row.addCell(DataCell(c, cell.value()));
+    const String &sql = table.style["sql"];
+    DataTable t;
+    if (_dbClient->executeSqlQuery(sql, t) && t.rowCount() > 0) {
+        for (size_t i = 0; i < t.rowCount(); ++i) {
+            const DataRow &r = t.rows()[i];
+            DataRow row;
+            for (size_t j = 0; j < table.columns.count(); ++j) {
+                const Column &c = table.columns[j];
+                DataColumn column(c.name, DbValue::fromTypeStr(c.type), c.pkey);
+                if (String::equals(c.registerStr, "SnowFlake", true)) {
+                    row.addCell(DataCell(column, DbClient::generateSnowFlakeId()));
+                } else if (String::equals(c.registerStr, "Uuid", true)) {
+                    row.addCell(DataCell(column, Uuid::generate().toString()));
                 } else {
-                    row.addCell(DataCell(c, DbValue::NullValue));
+                    const DataCell &cell = r.cells().at(c.name);
+                    row.addCell(DataCell(column, cell.value()));
                 }
             }
+            dataTable.addRow(row);
         }
+        return true;
     }
-    if (row.cellCount() > 0) {
-        t.addRow(row);
+    return false;
+}
+
+bool TaskDbProvider::getValue(const Style &value, Variable::Values &values) {
+    if (_dbClient == nullptr) {
+        return false;
+    }
+
+    const String &sql = value["sql"];
+    DataTable table;
+    if (_dbClient->executeSqlQuery(sql, table) &&
+        table.rowCount() > 0 && table.columnCount() > 0) {
+        for (size_t i = 0; i < table.rowCount(); ++i) {
+            const DataRow &row = table.rows()[i];
+            // retrieved the first column.
+            values.add(row.cells()[0].value());
+        }
         return true;
     }
     return false;

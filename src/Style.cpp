@@ -26,8 +26,16 @@ void Style::evaluates(const Style &other) {
     this->_values = other._values;
 }
 
-const String &Style::at(const String &pos) const {
+String Style::at(const String &pos) const {
     return _values.at(pos);
+}
+
+String &Style::at(const String &pos) {
+    return _values.at(pos);
+}
+
+bool Style::set(const String &pos, const String &value) {
+    return _values.set(pos, value);
 }
 
 bool Style::isEmpty() const {
@@ -51,6 +59,21 @@ String Style::toString() const {
         result.append(String::format("%s:%s", k.c_str(), v.c_str()));
     }
     return result;
+}
+
+void Style::addRange(const Style &style) {
+    _values.addRange(style._values);
+}
+
+bool Style::containsVar(const String &varName) const {
+    for (auto it = _values.begin(); it != _values.end(); ++it) {
+//        const String &k = it.key();
+        const String &v = it.value();
+        if (v.find(String::format("$%s", varName.c_str())) >= 0) {
+            return true;
+        }
+    }
+    return false;
 }
 
 bool Style::parse(const String &str, Style &style) {
