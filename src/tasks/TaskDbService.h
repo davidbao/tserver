@@ -27,12 +27,6 @@ public:
 
     bool unInitialize();
 
-    bool deleteRecords(const Tables &tables);
-
-    bool deleteRecords(const TaskAction &action, const Variables &vars, const Tables &tables);
-
-    bool insert(const DataTable &dataTable);
-
     bool executeSql(const String &sql);
 
 private:

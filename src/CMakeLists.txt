@@ -104,15 +104,7 @@ endif ()
 
 set(COMMON_LIB common${CMAKE_FIND_LIBRARY_SUFFIXES} ${EXTERNALS_LIB})
 set(TSERVER_LIB ${COMMON_LIB})
-if (TSERVER_BUILD_D5000)
-    set(TSERVER_LIB ${TSERVER_LIB} odb_apiall_lib)
-endif ()
 #    message(STATUS "TSERVER_LIB: " ${TSERVER_LIB})
-
-# definitions
-if (TSERVER_BUILD_D5000)
-    add_definitions(-DHAS_D5000=1)
-endif ()
 
 # application settings
 set(TSERVER_SRC main)
@@ -123,7 +115,7 @@ endif ()
 
 set(MAIN_SRC main.cpp AppStarter.cpp AdminService.cpp ExcService.cpp Style.cpp TaskService.cpp WebService.cpp)
 set(EXCHANGE_SRC exchanges/ExcDbProvider.cpp exchanges/ExcSimProvider.cpp exchanges/ExcContext.cpp)
-set(TASK_SRC tasks/TaskContext.cpp tasks/TaskD5kProvider.cpp tasks/TaskDbProvider.cpp tasks/TaskDbService.cpp)
+set(TASK_SRC tasks/TaskContext.cpp tasks/TaskDbService.cpp)
 
 add_executable(tserver ${MAIN_SRC} ${EXCHANGE_SRC} ${TASK_SRC})
 target_link_libraries(tserver ${TSERVER_LIB})

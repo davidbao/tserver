@@ -28,7 +28,6 @@ using namespace Crypto;
 TaskService::TaskService() : _timer(nullptr) {
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
-    factory->addService<ITaskProviders>(this);
     factory->addService<IConfigService>("TaskService", this);
 }
 
@@ -40,14 +39,11 @@ TaskService::~TaskService() {
 
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
-    factory->removeService<ITaskProviders>();
     factory->removeService<IConfigService>("TaskService");
 }
 
 bool TaskService::initialize() {
     loadData();
-
-    initDataSources();
 
     initTasks();
 
@@ -138,67 +134,14 @@ void TaskService::initTasks() {
                                 new SqlExecution(sql, true) :
                                 new SqlExecution(fileName, false);
                 } else if (type == "python") {
-                    String script, fileName;
+                    String script, fileName, param;
                     cs->getProperty(String::format(executionPrefix "script", i), script);
                     cs->getProperty(String::format(executionPrefix "file", i), fileName);
+                    cs->getProperty(String::format(executionPrefix "param", i), param);
                     execution = !script.isNullOrEmpty() ?
-                            new PythonExecution(script, true) :
-                            new PythonExecution(fileName, false);
-                } else { // inner.
-                    InnerExecution *ie = new InnerExecution();
-
-                    // vars.
-                    for (int j = 0; j < maxVarCount; j++) {
-                        String varName;
-                        if (!cs->getProperty(String::format(varPrefix "name", i, j), varName)) {
-                            break;
-                        }
-                        Variable var(varName);
-                        cs->getProperty(String::format(varPrefix "value", i, j), var.value);
-                        ie->vars.add(var);
-                    }
-                    // actions.
-                    for (int j = 0; j < maxActionCount; j++) {
-                        String actionName;
-                        if (!cs->getProperty(String::format(actionPrefix "name", i, j), actionName)) {
-                            break;
-                        }
-                        TaskAction action(actionName);
-                        cs->getProperty(String::format(actionPrefix "style", i, j), action.style);
-                        ie->actions.add(action);
-                    }
-                    // tables.
-                    for (int j = 0; j < maxTableCount; j++) {
-                        String tableName;
-                        if (!cs->getProperty(String::format(tablePrefix "name", i, j), tableName)) {
-                            break;
-                        }
-                        bool tEnable = true;
-                        cs->getProperty(String::format(tablePrefix "enable", i, j), tEnable);
-                        if (tEnable) {
-                            Table table(tableName);
-                            cs->getProperty(String::format(tablePrefix "register", i, j), table.registerStr);
-                            cs->getProperty(String::format(tablePrefix "style", i, j), table.style);
-                            for (int k = 0; k < maxColumnCount; k++) {
-                                String columnName;
-                                if (!cs->getProperty(String::format(columnPrefix "name", i, j, k), columnName)) {
-                                    break;
-                                }
-                                Column column(columnName);
-                                cs->getProperty(String::format(columnPrefix "register", i, j, k), column.registerStr);
-                                // update column style from table datasource and style.
-                                if (!table.style.isEmpty()) {
-                                    column.style.addRange(table.style);
-                                }
-                                cs->getProperty(String::format(columnPrefix "style", i, j, k), column.style);
-                                cs->getProperty(String::format(columnPrefix "type", i, j, k), column.type);
-                                cs->getProperty(String::format(columnPrefix "pkey", i, j, k), column.pkey);
-                                table.columns.add(column);
-                            }
-                            ie->tables.add(table);
-                        }
-                    }
-                    execution = ie;
+                                new PythonExecution(script) :
+                                new PythonExecution(fileName, param);
+                } else {
                 }
             }
 
@@ -574,211 +517,6 @@ void TaskService::updateYmlProperties(const Task *task, int position, YmlNode::P
 
 void TaskService::updateYmlProperties(bool enable, int position, YmlNode::Properties &properties) {
     properties.add(String::format(taskPrefix "enable", position), enable);
-}
-
-
-void TaskService::initDataSources() {
-    ServiceFactory *factory = ServiceFactory::instance();
-    assert(factory);
-    auto *cs = factory->getService<IConfigService>("TaskService");
-    assert(cs);
-
-//    cs->printProperties();
-
-    _dss.clear();
-    for (int i = 0; i < maxDataSourceCount; i++) {
-        String dsName;
-        if (!cs->getProperty(String::format(dataSourcePrefix "name", i), dsName)) {
-            break;
-        }
-        DataSource *ds = nullptr;
-        String type = cs->getProperty(String::format(dataSourcePrefix "type", i));
-        if (String::equals(type, "database", true)) {
-            auto db = new DbSource(dsName);
-            cs->getProperty(String::format(dataSourcePrefix "username", i), db->userName);
-            cs->getProperty(String::format(dataSourcePrefix "password", i), db->password);
-            cs->getProperty(String::format(dataSourcePrefix "url", i), db->url);
-            ds = db;
-        } else if (String::equals(type, "D5000", true) || String::equals(type, "D5K", true)) {
-            auto d5k = new D5kSource(dsName);
-            cs->getProperty(String::format(dataSourcePrefix "appNo", i), d5k->appNo);
-            ds = d5k;
-        }
-        if (ds != nullptr) {
-            ds->createProvider();
-            _dss.add(ds);
-        }
-    }
-}
-
-//bool TaskService::execute(const Task *task) {
-//    if (task == nullptr) {
-//        return false;
-//    }
-//
-//    ServiceFactory *factory = ServiceFactory::instance();
-//    assert(factory);
-//    auto ss = factory->getService<TaskDbService>();
-//    assert(ss);
-//
-//    // calc vars.
-//    Variables vars;
-//    updateVars(task, vars);
-//
-//    // execute.
-//    bool executed = false;
-//    for (size_t i = 0; i < task->actions.count(); ++i) {
-//        const TaskAction &action = task->actions[i];
-//        if (String::equals(action.name, "delete all", true)) {
-//            ss->deleteRecords(task->tables);
-//            executed = true;
-//        } else if (String::equals(action.name, "delete", true)) {
-//            ss->deleteRecords(action, vars, task->tables);
-//            executed = true;
-//        } else if (String::equals(action.name, "insert", true)) {
-//            // retrieved from provider.
-//            for (size_t j = 0; j < task->tables.count(); ++j) {
-//                const Table &table = task->tables[j];
-//                DataTable dataTable(table.name);
-//                if (getValue(action, vars, table, dataTable)) {
-//                    ss->insert(dataTable);
-//                    executed = true;
-//                }
-//            }
-//        }
-//    }
-//    return executed;
-//}
-//
-//void TaskService::updateVars(const Task *task, Variables &vars) const {
-//    for (size_t i = 0; i < task->vars.count(); ++i) {
-//        const TaskVar &var = task->vars[i];
-//        ITaskProvider *provider = getProvider(var.value["datasource"]);
-//        if (provider != nullptr) {
-//            auto v = unique_ptr<Values>(new Values());
-//            if (provider->getValue(var.value, v.get())) {
-//                vars.add(var.name, v.release());
-//            }
-//        } else {
-//            String str = var.value.toString();
-//            double minValue, maxValue, step;
-//            if (parseDoubleStyle(str, minValue, maxValue, step)) {
-//                auto values = new Values();
-//                for (double v = minValue; v < maxValue; v += step) {
-//                    values->add(Variant(v));
-//                }
-//                vars.add(var.name, values);
-//                continue;
-//            }
-//
-//            StringArray texts;
-//            StringArray::parse(str, texts, ';');
-//            if (texts.count() > 0) {
-//                auto values = new Values();
-//                for (size_t j = 0; j < texts.count(); j++) {
-//                    values->add(Variant(texts[j].trim(' ')));
-//                }
-//                vars.add(var.name, values);
-//                continue;
-//            }
-//
-//            auto values = new Values{
-//                    Variant(var.value.toString())
-//            };
-//            vars.add(var.name, values);
-//        }
-//    }
-//}
-
-//bool TaskService::getValue(const TaskAction &action, const Variables &vars, const Table &table, DataTable &dataTable) {
-//    dataTable.setName(table.name);
-//    const Columns &columns = table.columns;
-//    dataTable.addColumns(columns.toColumns());
-//
-//    if (String::equals(table.registerStr, "database", true)) {
-//        ITaskProvider *provider = getProvider(table.style["datasource"]);
-//        if (provider != nullptr) {
-//            return provider->getValue(table, dataTable);
-//        }
-//    } else {
-//        const String where = action.style["where"];
-//        if (!where.isNullOrEmpty()) {
-//            for (auto it = vars.begin(); it != vars.end(); ++it) {
-//                const String &name = it.key();
-//                String varName = String::format("$%s", name.c_str());
-//                if (where.find(varName) > 0) {
-//                    const Values *values = it.value();
-//                    for (size_t j = 0; j < values->count(); ++j) {
-//                        const Variant &value = values->at(j);
-//                        String whereStr = String::replace(where, varName, values->at(j).toString());
-//                        addRow(dataTable, action, columns, {varName, values->at(j).toString()});
-//                    }
-//                }
-//            }
-//        } else {
-//            addRow(dataTable, action, columns);
-//        }
-//    }
-//
-//    return true;
-//}
-
-//void TaskService::addRow(DataTable &dataTable, const TaskAction &action,
-//                         const Columns &columns, const Variable &var) const {
-//    DataRow row;
-//    for (size_t i = 0; i < dataTable.columnCount(); ++i) {
-//        const DataColumn &c = dataTable.columns()[i];
-//        Column column;
-//        if (columns.getColumn(c.name(), column)) {
-//            if (String::equals(column.registerStr, "SnowFlake", true)) {
-//                row.addCell(DataCell(c, DbClient::generateSnowFlakeId()));
-//            } else if (String::equals(column.registerStr, "Uuid", true)) {
-//                row.addCell(DataCell(c, Uuid::generate().toString()));
-//            } else if (String::equals(column.registerStr, "database", true) ||
-//                       String::equals(column.registerStr, "rtdb", true)) {
-//                ITaskProvider *provider = getProvider(column.style["datasource"]);
-//                if (provider != nullptr) {
-//                    if (!var.isEmpty()) {
-//                        // append where str in column sql.
-//                        const String where = action.style["where"];
-//                        String whereStr = String::replace(where, var.name, var.value);
-//                        String sql = String::format("%s WHERE %s",
-//                                                    column.style["sql"].toString().c_str(),
-//                                                    whereStr.c_str());
-//                        column.style["sql"] = sql;
-//                    }
-//
-//                    DbValue value;
-//                    if (provider->getValue(column, value)) {
-//                        row.addCell(DataCell(c, value));
-//                    } else {
-//                        row.addCell(DataCell(c, DbValue::NullValue));
-//                    }
-//                }
-//            } else if (String::equals(column.registerStr, "now", true)) {
-//                DateTime now = DateTime::now();
-//                row.addCell(DataCell(c, now.toString(column.style["format"].trim(' ', ';', '\''))));
-//            } else {
-//                if (!var.isEmpty()) {
-//                    String valueStr = String::replace(column.registerStr, var.name, var.value);
-//                    row.addCell(DataCell(c, DbValue(c.type(), valueStr)));
-//                } else {
-//                    row.addCell(DataCell(c, DbValue(c.type(), column.registerStr)));
-//                }
-//            }
-//        }
-//    }
-//    dataTable.addRow(row);
-//}
-
-ITaskProvider *TaskService::getProvider(const String &dsName) const {
-    for (size_t i = 0; i < _dss.count(); ++i) {
-        const DataSource *ds = _dss[i];
-        if (ds->name == dsName) {
-            return ds->provider();
-        }
-    }
-    return nullptr;
 }
 
 const YmlNode::Properties &TaskService::properties() const {
