@@ -25,7 +25,7 @@ WebService::~WebService() = default;
 bool WebService::initialize() {
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
-    auto *hs = factory->getService<IHttpRegister>();
+    auto hs = factory->getService<IHttpRegister>();
     assert(hs);
 
 #define BasePath "v1/catalog"
@@ -33,7 +33,7 @@ bool WebService::initialize() {
                         HttpCallback<WebService>(this, &WebService::onExchange));
 
     // register web server.
-    auto *cs = factory->getService<IConfigService>();
+    auto cs = factory->getService<IConfigService>();
     assert(cs);
     bool enable = true;
     cs->getProperty("summer.web.enable", enable);
@@ -51,7 +51,7 @@ bool WebService::unInitialize() {
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
 
-    auto *hs = factory->getService<IHttpRegister>();
+    auto hs = factory->getService<IHttpRegister>();
     assert(hs);
     hs->removeMapping(this);
 
@@ -115,21 +115,21 @@ HttpStatus WebService::onExchange(const HttpRequest &request, HttpResponse &resp
 
         ServiceFactory *factory = ServiceFactory::instance();
         assert(factory);
-        auto *ds = factory->getService<ExcService>();
-        assert(ds);
+        auto es = factory->getService<ExcService>();
+        assert(es);
 
         JsonNode dataNode("data");
 
         // process label node.
         JsonNode labelNode;
-        FetchResult lResult = ds->getLabelValues(root["label"], labelNode);
+        FetchResult lResult = es->getLabelValues(root["label"], labelNode);
         if (lResult == FetchResult::Succeed) {
             dataNode.add(labelNode);
         }
 
         // process table node.
         JsonNode tableNode;
-        FetchResult tResult = ds->getTableValues(root["table"], tableNode);
+        FetchResult tResult = es->getTableValues(root["table"], tableNode);
         if (tResult == FetchResult::Succeed) {
             dataNode.add(tableNode);
         }

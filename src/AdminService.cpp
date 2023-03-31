@@ -59,8 +59,8 @@ bool AdminService::initialize() {
                         HttpCallback<AdminService>(this, &AdminService::onGetTask));
     hs->registerMapping(HttpMethod::Put, TaskPath "/task",
                         HttpCallback<AdminService>(this, &AdminService::onAddTask));
-    hs->registerMapping(HttpMethod::Put, TaskPath "/task/app",
-                        HttpCallback<AdminService>(this, &AdminService::onAddTaskApp));
+    hs->registerMapping(HttpMethod::Put, TaskPath "/task/file",
+                        HttpCallback<AdminService>(this, &AdminService::onAddTaskFile));
     hs->registerMapping(HttpMethod::Delete, TaskPath "/task",
                         HttpCallback<AdminService>(this, &AdminService::onRemoveTask));
     hs->registerMapping(HttpMethod::Post, TaskPath "/task",
@@ -129,7 +129,7 @@ HttpStatus AdminService::onGetExchangeType(const HttpRequest &request, HttpRespo
     auto method = [](const StringMap &tRequest, StringMap &tResponse) {
         ServiceFactory *factory = ServiceFactory::instance();
         assert(factory);
-        auto *ss = factory->getService<ExcService>();
+        auto ss = factory->getService<ExcService>();
         assert(ss);
         return ss->getType(tRequest, tResponse);
     };
@@ -207,10 +207,10 @@ HttpStatus AdminService::onEnableBundle(const HttpRequest &request, HttpResponse
 bool AdminService::onGetTaskList(const HttpRequest &request, const SqlSelectFilter &filter, DataTable &table) {
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
-    auto *ss = factory->getService<TaskService>();
-    assert(ss);
+    auto ts = factory->getService<TaskService>();
+    assert(ts);
 
-    return ss->getTasks(filter, table);
+    return ts->getTasks(filter, table);
 }
 
 HttpStatus AdminService::onGetTask(const HttpRequest &request, HttpResponse &response) {
@@ -218,9 +218,9 @@ HttpStatus AdminService::onGetTask(const HttpRequest &request, HttpResponse &res
     auto method = [](const StringMap &tRequest, StringMap &tResponse) {
         ServiceFactory *factory = ServiceFactory::instance();
         assert(factory);
-        auto *ss = factory->getService<TaskService>();
-        assert(ss);
-        return ss->getTask(tRequest, tResponse);
+        auto ts = factory->getService<TaskService>();
+        assert(ts);
+        return ts->getTask(tRequest, tResponse);
     };
     return onAction(request, response, method);
 }
@@ -230,14 +230,14 @@ HttpStatus AdminService::onAddTask(const HttpRequest &request, HttpResponse &res
     auto method = [](const StringMap &tRequest, StringMap &tResponse) {
         ServiceFactory *factory = ServiceFactory::instance();
         assert(factory);
-        auto *ss = factory->getService<TaskService>();
-        assert(ss);
-        return ss->addTask(tRequest, tResponse);
+        auto ts = factory->getService<TaskService>();
+        assert(ts);
+        return ts->addTask(tRequest, tResponse);
     };
     return onAction(request, response, method);
 }
 
-HttpStatus AdminService::onAddTaskApp(const HttpRequest &request, HttpResponse &response) {
+HttpStatus AdminService::onAddTaskFile(const HttpRequest &request, HttpResponse &response) {
     JsonNode result;
     StringMap tRequest, tResponse;
     tRequest.add("name", request.getPropValue("name"));
@@ -249,10 +249,10 @@ HttpStatus AdminService::onAddTaskApp(const HttpRequest &request, HttpResponse &
 
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
-    auto *ss = factory->getService<TaskService>();
-    assert(ss);
+    auto ts = factory->getService<TaskService>();
+    assert(ts);
 
-    ss->addTaskApp(tRequest, tResponse);
+    ts->addTaskFile(tRequest, tResponse);
 
     int code = HttpCode::Ok;
     Int32::parse(tResponse["code"], code);
@@ -268,9 +268,9 @@ HttpStatus AdminService::onRemoveTask(const HttpRequest &request, HttpResponse &
     auto method = [](const StringMap &tRequest, StringMap &tResponse) {
         ServiceFactory *factory = ServiceFactory::instance();
         assert(factory);
-        auto *ss = factory->getService<TaskService>();
-        assert(ss);
-        return ss->removeTask(tRequest, tResponse);
+        auto ts = factory->getService<TaskService>();
+        assert(ts);
+        return ts->removeTask(tRequest, tResponse);
     };
     return onAction(request, response, method);
 }
@@ -280,9 +280,9 @@ HttpStatus AdminService::onUpdateTask(const HttpRequest &request, HttpResponse &
     auto method = [](const StringMap &tRequest, StringMap &tResponse) {
         ServiceFactory *factory = ServiceFactory::instance();
         assert(factory);
-        auto *ss = factory->getService<TaskService>();
-        assert(ss);
-        return ss->updateTask(tRequest, tResponse);
+        auto ts = factory->getService<TaskService>();
+        assert(ts);
+        return ts->updateTask(tRequest, tResponse);
     };
     return onAction(request, response, method);
 }

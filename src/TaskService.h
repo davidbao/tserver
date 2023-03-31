@@ -39,33 +39,44 @@ public:
 
     bool addTask(const StringMap &request, StringMap &response);
 
-    bool addTaskApp(const StringMap &request, StringMap &response);
+    bool addTaskFile(const StringMap &request, StringMap &response);
 
     bool removeTask(const StringMap &request, StringMap &response);
 
     bool updateTask(const StringMap &request, StringMap &response);
 
 private:
-    void initTasks();
-
-    void taskTimeUp();
-
-    bool addOrUpdateTask(const StringMap &request, StringMap &response, int position = -1);
-
+    // IConfigService
     const YmlNode::Properties &properties() const final;
 
     bool setProperty(const String &key, const String &value) final;
 
     bool updateConfigFile(const YmlNode::Properties &properties) final;
 
+    void initTasks();
+
+    void initTasks(const YmlNode::Properties &properties);
+
+    void initTasks(const DataTable &table);
+
+    void taskTimeUp();
+
+    bool addOrUpdateTask(const StringMap &request, StringMap &response, int position = -1);
+
     bool loadData();
 
+    bool saveData(const Crontabs &crontabs);
+
+    bool saveData(const Crontab *crontab);
+
 private:
-    static String getAppPath();
+    static void saveData(const Crontabs &crontabs, YmlNode::Properties &properties);
 
-    static void updateYmlProperties(const Task *task, int position, YmlNode::Properties &properties);
+    static void saveData(const Crontab *crontab, int position, YmlNode::Properties &properties);
 
-    static void updateYmlProperties(bool enable, int position, YmlNode::Properties &properties);
+    static void saveData(const Crontabs &crontabs, DataTable &table);
+
+    static void saveData(const Crontab *crontab, DataTable &table);
 
 private:
 #define maxTaskCount 1000
@@ -73,13 +84,16 @@ private:
 #define schedulePrefix "tasks[%d].schedule."
 #define executionPrefix "tasks[%d].execution."
 
-    Tasks _tasks;
-
-    YmlNode::Properties _properties;
+    Crontabs _crontabs;
 
     Timer *_timer;
 
     TaskDbService _dbService;
+
+    DbClient *_dbClient;
+    DataTable _table;
+
+    YmlNode::Properties _properties;
 };
 
 

@@ -236,6 +236,8 @@ private:
     static void updateTableYmlProperties(bool enable, int position, YmlNode::Properties &properties);
 
 private:
+#define simulatorPrefix "summer.exchange.simulator."
+
 #define maxLabelCount 1000
 #define labelPrefix "labels[%d]."
 #define maxTagCount 1000

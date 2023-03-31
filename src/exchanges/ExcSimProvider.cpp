@@ -856,11 +856,11 @@ bool ExcSimProvider::loadData() {
     assert(cs);
 
     String type;
-    cs->getProperty("summer.exchange.simulator.type", type);
+    cs->getProperty(simulatorPrefix "type", type);
     if (String::equals(type, "file", true)) {
         // load yml file.
         String path = Application::instance()->rootPath();
-        String name = cs->getProperty("summer.exchange.simulator.file.name");
+        String name = cs->getProperty(simulatorPrefix "file.name");
         String fileName = Path::combine(path, String::format("%s.yml", name.c_str()));
         return YmlNode::loadFile(fileName, _properties);
     } else if (String::equals(type, "database", true)) {
@@ -1008,6 +1008,9 @@ bool ExcSimProvider::getLabels(const SqlSelectFilter &filter, DataTable &table) 
         const Label &label = match[i];
         table.addRow(label.toDataRow(table));
     }
+
+    // order by
+    table.sort(filter.orderBy());
 
     return true;
 }
@@ -1205,6 +1208,9 @@ bool ExcSimProvider::getTables(const SqlSelectFilter &filter, DataTable &table) 
         table.addRow(t.toDataRow(table));
     }
 
+    // order by
+    table.sort(filter.orderBy());
+
     return true;
 }
 
@@ -1357,7 +1363,7 @@ bool ExcSimProvider::updateConfigFile(const YmlNode::Properties &properties) {
     assert(cs);
 
     String path = Application::instance()->rootPath();
-    String name = cs->getProperty("summer.exchange.simulator.file.name");
+    String name = cs->getProperty(simulatorPrefix "file.name");
     String fileName = Path::combine(path, String::format("%s.yml", name.c_str()));
     bool result = YmlNode::updateFile(fileName, properties);
     if (result) {

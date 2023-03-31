@@ -29,7 +29,8 @@ enum HttpErrorCode {
     CycleInvalid = 65,              // Cycle interval is invalid.
     TimeInvalid = 66,               // Time interval is invalid.
     RepeatInvalid = 67,             // Repeat type is invalid.
-    CannotFindTaskType = 68,        // Can not find task type.
+    CannotFindScheduleType = 68,    // Can not find schedule type.
+    CannotFindExecutionType = 69,   // Can not find execution type.
 
     // web
     CannotFindWWWBundlePath = 81,   // Can not find www bundle path.
@@ -44,21 +45,22 @@ class HttpRegisters {
 public:
     static void registerCodes() {
         HttpCode::registerCode({
-                                       {CannotFindLabel,        "Can not find label by name."},
-                                       {DuplicateName,          "Duplicate name."},
-                                       {FailedToSave,           "Failed to save config file."},
-                                       {CannotFindTable,        "Can not find table by name."},
-                                       {CannotFindTask,         "Can not find task by name."},
-                                       {CannotFindFile,         "Can not find the upload file."},
-                                       {FailedToVerifyMd5,      "Failed to verify the upload file md5."},
-                                       {CannotExtractZip,       "Can not extract the zip file."},
-                                       {CannotCopyApp,          "Can not copy the app file."},
-                                       {CycleInvalid,           "Cycle interval is invalid."},
-                                       {TimeInvalid,            "Time interval is invalid."},
-                                       {RepeatInvalid,          "Repeat type is invalid."},
-                                       {CannotFindTaskType,     "Can not find task type."},
-                                       {CannotFindExchangeType, "Can not find exchange type."},
-                                       {ExchangeTypeInvalid,    "The current exchange type is invalid."},
+                                       {CannotFindLabel,         "Can not find label by name."},
+                                       {DuplicateName,           "Duplicate name."},
+                                       {FailedToSave,            "Failed to save config file."},
+                                       {CannotFindTable,         "Can not find table by name."},
+                                       {CannotFindTask,          "Can not find task by name."},
+                                       {CannotFindFile,          "Can not find the upload file."},
+                                       {FailedToVerifyMd5,       "Failed to verify the upload file md5."},
+                                       {CannotExtractZip,        "Can not extract the zip file."},
+                                       {CannotCopyApp,           "Can not copy the app file."},
+                                       {CycleInvalid,            "Cycle interval is invalid."},
+                                       {TimeInvalid,             "Time interval is invalid."},
+                                       {RepeatInvalid,           "Repeat type is invalid."},
+                                       {CannotFindScheduleType,  "Can not find schedule type."},
+                                       {CannotFindExecutionType, "Can not find execution type."},
+                                       {CannotFindExchangeType,  "Can not find exchange type."},
+                                       {ExchangeTypeInvalid,     "The current exchange type is invalid."},
                                });
     }
 };

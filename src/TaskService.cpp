@@ -20,18 +20,26 @@
 #include "TaskService.h"
 #include "HttpErrorCode.h"
 #include "tasks/TaskContext.h"
+#include "microservice/DataSourceService.h"
+
 
 using namespace IO;
 using namespace Config;
 using namespace Crypto;
+using namespace Microservice;
 
-TaskService::TaskService() : _timer(nullptr) {
+TaskService::TaskService() : _timer(nullptr), _dbClient(nullptr), _table("task") {
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
     factory->addService<IConfigService>("TaskService", this);
+    factory->addService<TaskService>(this);
 }
 
 TaskService::~TaskService() {
+    if (_dbClient != nullptr) {
+        delete _dbClient;
+        _dbClient = nullptr;
+    }
     if (_timer != nullptr) {
         delete _timer;
         _timer = nullptr;
@@ -40,6 +48,7 @@ TaskService::~TaskService() {
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
     factory->removeService<IConfigService>("TaskService");
+    factory->removeService<TaskService>();
 }
 
 bool TaskService::initialize() {
@@ -69,47 +78,61 @@ bool TaskService::unInitialize() {
 }
 
 void TaskService::initTasks() {
-    String path = getAppPath();
-    if (!Directory::exists(path)) {
-        Directory::createDirectory(path);
-    }
-
-    Locker locker(&_tasks);
-    _tasks.clear();
+    Locker locker(&_crontabs);
+    _crontabs.clear();
 
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
-    auto cs = factory->getService<IConfigService>("TaskService");
+    auto cs = factory->getService<IConfigService>();
     assert(cs);
+
+    String type;
+    cs->getProperty("summer.task.type", type);
+    if (String::equals(type, "file", true)) {
+        initTasks(_properties);
+    } else if (String::equals(type, "database", true)) {
+        initTasks(_table);
+    }
+}
+
+void TaskService::initTasks(const YmlNode::Properties &properties) {
+    ServiceFactory *factory = ServiceFactory::instance();
+    assert(factory);
+    auto ts = factory->getService<IConfigService>("TaskService");
+    assert(ts);
 
     for (int i = 0; i < maxTaskCount; i++) {
         String name;
-        if (!cs->getProperty(String::format(taskPrefix "name", i), name)) {
+        if (!ts->getProperty(String::format(taskPrefix "name", i), name)) {
             break;
         }
 
         bool enable = true;
-        cs->getProperty(String::format(taskPrefix "enable", i), enable);
+        ts->getProperty(String::format(taskPrefix "enable", i), enable);
         if (enable) {
             // schedule.
             Schedule *schedule = nullptr;
             {
                 String type;
-                cs->getProperty(String::format(schedulePrefix "type", i), type);
+                ts->getProperty(String::format(schedulePrefix "type", i), type);
                 if (type == "cycle") {
                     TimeSpan interval;
-                    cs->getProperty(String::format(schedulePrefix "interval", i), interval);
+                    ts->getProperty(String::format(schedulePrefix "interval", i), interval);
                     if (interval != TimeSpan::Zero) {
                         schedule = new CycleSchedule(interval);
+                    } else {
+                        Trace::error("Cycle interval is invalid.");
                     }
                 } else if (type == "timing") {
                     DateTime time;
-                    cs->getProperty(String::format(schedulePrefix "time", i), time);
+                    ts->getProperty(String::format(schedulePrefix "time", i), time);
                     String repeatType, repeatValue;
-                    cs->getProperty(String::format(schedulePrefix "repeat.type", i), repeatType);
-                    cs->getProperty(String::format(schedulePrefix "repeat.value", i), repeatValue);
-                    if (time != DateTime::MinValue) {
+                    ts->getProperty(String::format(schedulePrefix "repeat.type", i), repeatType);
+                    ts->getProperty(String::format(schedulePrefix "repeat.value", i), repeatValue);
+                    if (TimingSchedule::allRepeatTypes().contains(repeatType, true)) {
                         schedule = new TimingSchedule(time, repeatType, repeatValue);
+                    } else {
+                        Trace::error("Repeat type is invalid.");
                     }
                 } else {
                     Trace::error(String::format("Can not find schedule type'%s'!", type.c_str()));
@@ -120,112 +143,116 @@ void TaskService::initTasks() {
             Execution *execution = nullptr;
             {
                 String type;
-                cs->getProperty(String::format(executionPrefix "type", i), type);
+                ts->getProperty(String::format(executionPrefix "type", i), type);
+                bool sync = true;
+                ts->getProperty(String::format(executionPrefix "sync.enable", i), sync);
+                TimeSpan timeout = TimeSpan::fromSeconds(10);
+                ts->getProperty(String::format(executionPrefix "sync.timeout", i), timeout);
                 if (type == "app") {
                     String app, param;
-                    cs->getProperty(String::format(executionPrefix "app", i), app);
-                    cs->getProperty(String::format(executionPrefix "param", i), param);
-                    execution = new AppExecution(path, app, param);
+                    ts->getProperty(String::format(executionPrefix "app", i), app);
+                    ts->getProperty(String::format(executionPrefix "param", i), param);
+                    execution = new AppExecution(sync, timeout, app, param);
                 } else if (type == "sql") {
                     String sql, fileName;
-                    cs->getProperty(String::format(executionPrefix "sql", i), sql);
-                    cs->getProperty(String::format(executionPrefix "file", i), fileName);
+                    ts->getProperty(String::format(executionPrefix "sql", i), sql);
+                    ts->getProperty(String::format(executionPrefix "file", i), fileName);
                     execution = !sql.isNullOrEmpty() ?
-                                new SqlExecution(sql, true) :
-                                new SqlExecution(fileName, false);
+                                new SqlExecution(sync, timeout, sql, true) :
+                                new SqlExecution(sync, timeout, fileName, false);
                 } else if (type == "python") {
                     String script, fileName, param;
-                    cs->getProperty(String::format(executionPrefix "script", i), script);
-                    cs->getProperty(String::format(executionPrefix "file", i), fileName);
-                    cs->getProperty(String::format(executionPrefix "param", i), param);
+                    ts->getProperty(String::format(executionPrefix "script", i), script);
+                    ts->getProperty(String::format(executionPrefix "file", i), fileName);
+                    ts->getProperty(String::format(executionPrefix "param", i), param);
                     execution = !script.isNullOrEmpty() ?
-                                new PythonExecution(script) :
-                                new PythonExecution(fileName, param);
+                                new PythonExecution(sync, timeout, script) :
+                                new PythonExecution(sync, timeout, fileName, param);
                 } else {
+                    Trace::error(String::format("Can not find the execution type'%s'!", type.c_str()));
                 }
             }
 
             if (schedule != nullptr && execution != nullptr) {
-                auto task = new Task(name, schedule, execution);
-                _tasks.add(task);
+                auto task = new Crontab(name, schedule, execution);
+                _crontabs.add(task);
             }
         }
     }
 }
 
-String TaskService::getAppPath() {
-    ServiceFactory *factory = ServiceFactory::instance();
-    assert(factory);
-    auto cs = factory->getService<IConfigService>();
-    assert(cs);
+void TaskService::initTasks(const DataTable &table) {
+    for (size_t i = 0; i < table.rowCount(); ++i) {
+        const DataRow &row = table.rows()[i];
+        const DataCells &cells = row.cells();
+        String name = cells["name"].valueStr();
+        String scheduleStr = cells["schedule"].valueStr();
+        String executionStr = cells["execution"].valueStr();
 
-    String subPath;
-    cs->getProperty("summer.task.path", subPath);
-    const String appPath = Path::getAppPath();
-    String path = Path::combine(appPath, subPath);
-    if (!Directory::exists(path)) {
-        Application *app = Application::instance();
-        assert(app);
-        path = Path::combine(app->rootPath(), subPath);
+        Schedule *schedule = nullptr;
+        Execution *execution = nullptr;
+        Crontab::parseSchedule(scheduleStr, schedule);
+        Crontab::parseExecution(executionStr, execution);
+        if (schedule != nullptr && execution != nullptr) {
+            auto task = new Crontab(name, schedule, execution);
+            _crontabs.add(task);
+        } else {
+            delete schedule;
+            delete execution;
+        }
     }
-    return path;
 }
 
 void TaskService::taskTimeUp() {
-    Locker locker(&_tasks);
-    for (size_t i = 0; i < _tasks.count(); ++i) {
-        Task *task = _tasks[i];
-        if (task->isTimeUp()) {
-            task->execute();
+    Locker locker(&_crontabs);
+    for (size_t i = 0; i < _crontabs.count(); ++i) {
+        Crontab *crontab = _crontabs[i];
+        if (crontab->isTimeUp()) {
+            crontab->execute();
         }
     }
 }
 
 bool TaskService::getTasks(const SqlSelectFilter &filter, DataTable &table) {
-//    Locker locker(&_tasks);
-//    Tasks match(false);
-//    for (size_t i = 0; i < _tasks.count(); ++i) {
-//        const Task *task = _tasks[i];
-//        String name = filter.getValue("name");
-//        String type = filter.getValue("type");
-//        String app = filter.getValue("app");
-//        if ((name.isNullOrEmpty() || task->name.find(name) >= 0) &&
-//            (type.isNullOrEmpty() || task->type() == type) &&
-//            (app.isNullOrEmpty() || task->app.find(app) >= 0)) {
-//            match.add(task);
-//        }
-//    }
-//
-//    table.setName("task");
-//    table.setTotalCount((int) match.count());
-//    table.addColumns({
-//                             DataColumn("name", ValueTypes::Text, true),
-//                             DataColumn("app", ValueTypes::Text, false),
-//                             DataColumn("param", ValueTypes::Text, false),
-//                             DataColumn("interval", ValueTypes::Text, false),
-//                             DataColumn("time", ValueTypes::Text, false),
-//                             DataColumn("repeatType", ValueTypes::Text, false),
-//                             DataColumn("repeatValue", ValueTypes::Text, false)
-//                     });
-//    size_t offset = Math::max(0, filter.offset());
-//    size_t count = Math::min((int) match.count(), filter.offset() + filter.limit());
-//    for (size_t i = offset; i < count; ++i) {
-//        const Task *task = match[i];
-//        table.addRow(task->toDataRow(table));
-//    }
+    Locker locker(&_crontabs);
+    Crontabs match(false);
+    for (size_t i = 0; i < _crontabs.count(); ++i) {
+        const Crontab *crontab = _crontabs[i];
+        String name = filter.getValue("name");
+        if ((name.isNullOrEmpty() || crontab->name().find(name) >= 0)) {
+            match.add(crontab);
+        }
+    }
+
+    table.setName("task");
+    table.setTotalCount((int) match.count());
+    table.addColumns({
+                             DataColumn("name", ValueTypes::Text, true),
+                             DataColumn("schedule", ValueTypes::Text, false),
+                             DataColumn("execution", ValueTypes::Text, false)
+                     });
+    size_t offset = Math::max(0, filter.offset());
+    size_t count = Math::min((int) match.count(), filter.offset() + filter.limit());
+    for (size_t i = offset; i < count; ++i) {
+        const Crontab *crontab = match[i];
+        table.addRow(crontab->toDataRow(table));
+    }
+
+    // order by
+    table.sort(filter.orderBy());
 
     return true;
 }
 
 bool TaskService::getTask(const StringMap &request, StringMap &response) {
     {
-        Locker locker(&_tasks);
+        Locker locker(&_crontabs);
         String name = request["name"];
-        for (size_t i = 0; i < _tasks.count(); ++i) {
-            const Task *task = _tasks[i];
-            if (task->name() == name) {
+        for (size_t i = 0; i < _crontabs.count(); ++i) {
+            const Crontab *crontab = _crontabs[i];
+            if (crontab->name() == name) {
                 response["code"] = "0";
-                response["data"] = task->toJsonNode().toString();
+                response["data"] = crontab->toJsonNode().toString();
                 return true;
             }
         }
@@ -237,11 +264,11 @@ bool TaskService::getTask(const StringMap &request, StringMap &response) {
 }
 
 bool TaskService::addTask(const StringMap &request, StringMap &response) {
-    Locker locker(&_tasks);
+    Locker locker(&_crontabs);
     String name = request["name"];
-    for (size_t i = 0; i < _tasks.count(); ++i) {
-        const Task *task = _tasks[i];
-        if (task->name() == name) {
+    for (size_t i = 0; i < _crontabs.count(); ++i) {
+        const Crontab *crontab = _crontabs[i];
+        if (crontab->name() == name) {
             // Duplicate name.
             response.addRange(HttpCode::at(DuplicateName));
             return false;
@@ -250,90 +277,86 @@ bool TaskService::addTask(const StringMap &request, StringMap &response) {
     return addOrUpdateTask(request, response);
 }
 
-bool TaskService::addTaskApp(const StringMap &request, StringMap &response) {
-//    String name = request["name"];
-//    String md5 = request["md5"];
-//    String fullFileName = request["fullFileName"];
-//    String app;
-//
-//    // find app name.
-//    {
-//        Locker locker(&_tasks);
-//        bool found = false;
-//        for (size_t i = 0; i < _tasks.count(); ++i) {
-//            const Task *task = _tasks[i];
-//            if (task->name() == name) {
-//                found = true;
-//                app = !task->app.isNullOrEmpty() ? task->app : task->name();
-//                break;
-//            }
-//        }
-//        if (!found) {
-//            // Can not find task by name.
-//            response.addRange(HttpCode::at(CannotFindTask));
-//            return false;
-//        }
-//    }
-//
-//    // file exist?
-//    if (!File::exists(fullFileName)) {
-//        // Can not find the upload file.
-//        response.addRange(HttpCode::at(CannotFindFile));
-//        return false;
-//    }
-//
-//    // check md5.
-//    if (!md5.isNullOrEmpty()) {
-//        String actual;
-//        if (Md5Provider::computeFileHash(fullFileName, actual)) {
-//            if (!String::equals(actual, md5, true)) {
-//                // Failed to verify the upload file md5.
-//                response.addRange(HttpCode::at(FailedToVerifyMd5));
-//                return false;
-//            }
-//        }
-//    }
-//
-//    // check task app path.
-//    String path = Path::combine(getAppPath(), name);
-//    if (!Directory::exists(path)) {
-//        Directory::createDirectory(path);
-//    }
-//
-//    // extract or copy app, check zip first.
-//    Zip zip(fullFileName);
-//    if (zip.isValid()) {
-//        if (!Zip::extract(fullFileName, path)) {
-//            if (Directory::exists(path)) {
-//                Directory::deleteDirectory(path);
-//            }
-//            // Can not extract the zip file.
-//            response.addRange(HttpCode::at(CannotExtractZip));
-//            return false;
-//        }
-//    } else {
-//        // not a zip file.
-//        String destFileName = Path::combine(path, app);
-//        if (!File::copy(fullFileName, destFileName, true)) {
-//            if (Directory::exists(path)) {
-//                Directory::deleteDirectory(path);
-//            }
-//            // Can not copy the app file.
-//            response.addRange(HttpCode::at(CannotCopyApp));
-//            return false;
-//        }
-//    }
-//
-//#ifndef WIN32
-//    // grant app permission.
-//    StringArray files;
-//    Directory::getFiles(path, "*", SearchOption::AllDirectories, files);
-//    for (size_t i = 0; i < files.count(); ++i) {
-//        File::chmod(files[i]);
-//    }
-//#endif
-//
-//    response.addRange(HttpCode::okCode());
+bool TaskService::addTaskFile(const StringMap &request, StringMap &response) {
+    String name = request["name"];
+    String md5 = request["md5"];
+    String fullFileName = request["fullFileName"];
+
+    // find file name.
+    const Crontab *current = nullptr;
+    {
+        Locker locker(&_crontabs);
+        for (size_t i = 0; i < _crontabs.count(); ++i) {
+            const Crontab *crontab = _crontabs[i];
+            if (crontab->isValid() && crontab->name() == name) {
+                current = crontab;
+                break;
+            }
+        }
+        if (current == nullptr) {
+            // Can not find task by name.
+            response.addRange(HttpCode::at(CannotFindTask));
+            return false;
+        }
+    }
+
+    // file not exist?
+    if (!File::exists(fullFileName)) {
+        // Can not find the upload file.
+        response.addRange(HttpCode::at(CannotFindFile));
+        return false;
+    }
+
+    // check md5.
+    if (!md5.isNullOrEmpty()) {
+        String actual;
+        if (Md5Provider::computeFileHash(fullFileName, actual)) {
+            if (!String::equals(actual, md5, true)) {
+                // Failed to verify the upload file md5.
+                response.addRange(HttpCode::at(FailedToVerifyMd5));
+                return false;
+            }
+        }
+    }
+
+    // check task file path.
+    String file = current->execution()->currentFile();
+    String path = Path::getDirectoryName(file);
+    if (!Directory::exists(path)) {
+        Directory::createDirectory(path);
+    }
+
+    // extract or copy file, check zip first.
+    Zip zip(fullFileName);
+    if (zip.isValid()) {
+        if (!Zip::extract(fullFileName, path)) {
+            if (Directory::exists(path)) {
+                Directory::deleteDirectory(path);
+            }
+            // Can not extract the zip file.
+            response.addRange(HttpCode::at(CannotExtractZip));
+            return false;
+        }
+    } else {
+        // not a zip file.
+        String destFileName = file;
+        if (!File::copy(fullFileName, destFileName, true)) {
+            // Can not copy the file.
+            response.addRange(HttpCode::at(CannotCopyApp));
+            return false;
+        }
+    }
+
+#ifndef WIN32
+    // grant file permission.
+    StringArray files;
+    Directory::getFiles(path, "*", SearchOption::AllDirectories, files);
+    for (size_t i = 0; i < files.count(); ++i) {
+        File::chmod(files[i]);
+    }
+#endif
+
+    response.addRange(HttpCode::okCode());
     return true;
 }
 
@@ -342,49 +365,35 @@ bool TaskService::removeTask(const StringMap &request, StringMap &response) {
     StringArray::parse(request["name"], names, ';');
 
     // find app name.
-    Locker locker(&_tasks);
-    bool found = false;
-    Vector<int> positions;
-    for (int i = (int) _tasks.count() - 1; i >= 0; --i) {
-        const Task *task = _tasks[i];
+    Locker locker(&_crontabs);
+    Crontabs removed(true);
+    for (int i = (int) _crontabs.count() - 1; i >= 0; --i) {
+        Crontab *crontab = _crontabs[i];
         for (size_t j = 0; j < names.count(); ++j) {
-            if (task->name() == names[j]) {
-                positions.add((int) i);
-                _tasks.removeAt(i);
-                found = true;
+            if (crontab->name() == names[j]) {
+                removed.add(crontab);
+                _crontabs.removeAt(i, false);
                 break;
             }
         }
     }
-    if (!found) {
+    if (removed.count() == 0) {
         // Can not find task by name.
         response.addRange(HttpCode::at(CannotFindTask));
         return false;
     }
 
-    // update profile yml file.
-    ServiceFactory *factory = ServiceFactory::instance();
-    assert(factory);
-    auto cs = factory->getService<IConfigService>();
-    assert(cs);
-
-    YmlNode::Properties properties;
-    for (size_t i = 0; i < positions.count(); ++i) {
-        updateYmlProperties(false, positions[i], properties);
-    }
-    if (!cs->updateConfigFile(properties)) {
+    // save data.
+    if (!saveData(removed)) {
         // Failed to save config file.
         response.addRange(HttpCode::at(FailedToSave));
         return false;
     }
 
-    // remove task app path.
-    for (size_t i = 0; i < names.count(); ++i) {
-        const String &name = names[i];
-        String path = Path::combine(getAppPath(), name);
-        if (Directory::exists(path)) {
-            Directory::deleteDirectory(path);
-        }
+    // remove task file.
+    for (size_t i = 0; i < removed.count(); ++i) {
+        Crontab *crontab = removed[i];
+        crontab->removeFile();
     }
 
     response.addRange(HttpCode::okCode());
@@ -392,13 +401,13 @@ bool TaskService::removeTask(const StringMap &request, StringMap &response) {
 }
 
 bool TaskService::updateTask(const StringMap &request, StringMap &response) {
-    Locker locker(&_tasks);
+    Locker locker(&_crontabs);
     String name = request["name"];
     int position;
     bool found = false;
-    for (size_t i = 0; i < _tasks.count(); ++i) {
-        const Task *task = _tasks[i];
-        if (task->name() == name) {
+    for (size_t i = 0; i < _crontabs.count(); ++i) {
+        const Crontab *crontab = _crontabs[i];
+        if (crontab->name() == name) {
             found = true;
             position = (int) i;
             break;
@@ -413,110 +422,274 @@ bool TaskService::updateTask(const StringMap &request, StringMap &response) {
 }
 
 bool TaskService::addOrUpdateTask(const StringMap &request, StringMap &response, int position) {
-//    String name = request["name"];
-//    Task *task = nullptr;
-//    String path = getAppPath();
-//    String type = request["type"];
-//    if (type == "cycle") {
-//        TimeSpan interval;
-//        if (TimeSpan::parse(request["interval"], interval) && interval != TimeSpan::Zero) {
-//            auto *t = new CycleTask(path);
-//            t->name = name;
-//            t->app = request["app"];
-//            t->param = request["param"];
-//            t->interval = interval;
-//            task = t;
-//        } else {
-//            // Cycle interval is invalid.
-//            response.addRange(HttpCode::at(CycleInvalid));
-//            return false;
-//        }
-//    } else if (type == "time") {
-//        DateTime time;
-//        if (!(DateTime::parse(request["time"], time) && time != DateTime::MinValue)) {
-//            // Time interval is invalid.
-//            response.addRange(HttpCode::at(TimeInvalid));
-//            return false;
-//        }
-//        if (!TimeTask::allRepeatTypes().contains(request["repeatType"], true)) {
-//            // Repeat type is invalid.
-//            response.addRange(HttpCode::at(RepeatInvalid));
-//            return false;
-//        }
-//
-//        auto *t = new TimeTask(path);
-//        t->name = name;
-//        t->app = request["app"];
-//        t->param = request["param"];
-//        t->time = time;
-//        t->repeatType = request["repeatType"];
-//        t->repeatValue = request["repeatValue"];
-//        task = t;
-//    } else {
-//        // Can not find task type.
-//        response.addRange(HttpCode::at(CannotFindTaskType));
-//        return false;
-//    }
-//
-//    if (task != nullptr) {
-//        // update profile yml file.
-//        ServiceFactory *factory = ServiceFactory::instance();
-//        assert(factory);
-//        auto cs = factory->getService<IConfigService>();
-//        assert(cs);
-//
-//        YmlNode::Properties properties;
-//        updateYmlProperties(task, position, properties);
-//        if (!cs->updateConfigFile(properties)) {
-//            delete task;    // Don't forget it.
-//            // Failed to save config file.
-//            response.addRange(HttpCode::at(FailedToSave));
-//            return false;
-//        }
-//
-//        // update tasks in memory.
-//        if (position >= 0) {
-//            _tasks.set(position, task);
-//        } else {
-//            _tasks.add(task);
-//        }
-//
-//        // check app file md5.
-//        bool needUploadApp = true;
-//        String fullFileName = Path::combine(path, task->app);
-//        if (File::exists(fullFileName)) {
-//            String actual;
-//            if (Md5Provider::computeFileHash(fullFileName, actual)) {
-//                needUploadApp = !String::equals(actual, request["appMd5"], true);
-//            }
-//        }
-//        response["needUploadApp"] = Boolean(needUploadApp).toString();
-//    }
-//
-//    response.addRange(HttpCode::okCode());
+    String name = request["name"];
+
+    bool error = false;
+    Schedule *schedule = nullptr;
+    {
+        JsonNode scheduleNode;
+        JsonNode::parse(request["schedule"], scheduleNode);
+        String type = scheduleNode.getAttribute("type");
+        if (type == "cycle") {
+            TimeSpan interval;
+            scheduleNode.getAttribute("interval", interval);
+            if (interval != TimeSpan::Zero) {
+                schedule = new CycleSchedule(interval);
+            } else {
+                // Cycle interval is invalid.
+                response.addRange(HttpCode::at(CycleInvalid));
+                error = true;
+            }
+        } else if (type == "timing") {
+            DateTime time;
+            scheduleNode.getAttribute("time", time);
+            String repeatType, repeatValue;
+            JsonNode repeatNode = scheduleNode["repeat"];
+            repeatNode.getAttribute("type", repeatType);
+            repeatNode.getAttribute("value", repeatValue);
+            if (!TimingSchedule::allRepeatTypes().contains(repeatType, true)) {
+                // Repeat type is invalid.
+                response.addRange(HttpCode::at(RepeatInvalid));
+                error = true;
+            }
+            schedule = new TimingSchedule(time, repeatType, repeatValue);
+        } else {
+            // Can not find schedule type.
+            response.addRange(HttpCode::at(CannotFindScheduleType));
+            error = true;
+        }
+    }
+
+    Execution *execution = nullptr;
+    {
+        JsonNode executionNode;
+        JsonNode::parse(request["execution"], executionNode);
+        String type = executionNode.getAttribute("type");
+        JsonNode syncNode = executionNode["sync"];
+        bool sync = true;
+        syncNode.getAttribute("enable", sync);
+        TimeSpan timeout = TimeSpan::fromSeconds(10);
+        syncNode.getAttribute("timeout", timeout);
+        if (type == "app") {
+            String app, param;
+            executionNode.getAttribute("app", app);
+            executionNode.getAttribute("param", param);
+            execution = new AppExecution(sync, timeout, app, param);
+        } else if (type == "sql") {
+            String sql, fileName;
+            executionNode.getAttribute("sql", sql);
+            executionNode.getAttribute("file", fileName);
+            execution = !sql.isNullOrEmpty() ?
+                        new SqlExecution(sync, timeout, sql, true) :
+                        new SqlExecution(sync, timeout, fileName, false);
+        } else if (type == "python") {
+            String script, fileName, param;
+            executionNode.getAttribute("script", script);
+            executionNode.getAttribute("file", fileName);
+            executionNode.getAttribute("param", param);
+            execution = !script.isNullOrEmpty() ?
+                        new PythonExecution(sync, timeout, script) :
+                        new PythonExecution(sync, timeout, fileName, param);
+        } else {
+            // Can not find execution type.
+            response.addRange(HttpCode::at(CannotFindExecutionType));
+            error = true;
+        }
+    }
+
+    if (error) {
+        delete schedule;
+        delete execution;
+        return false;
+    }
+
+    auto crontab = new Crontab(name, schedule, execution);
+
+    // update tasks in memory.
+    if (position >= 0) {
+        _crontabs.set(position, crontab);
+    } else {
+        _crontabs.add(crontab);
+    }
+
+    // save data.
+    if (!saveData(crontab)) {
+        delete crontab;    // Don't forget it.
+        // Failed to save config file.
+        response.addRange(HttpCode::at(FailedToSave));
+        return false;
+    }
+
+    // check file md5.
+    bool needUpload = !execution->checkFile(request["md5"]);
+    JsonNode dataNode;
+    dataNode.add(JsonNode("needUpload", needUpload));
+    response["data"] = dataNode.toString();
+
+    response.addRange(HttpCode::okCode());
     return true;
 }
 
-void TaskService::updateYmlProperties(const Task *task, int position, YmlNode::Properties &properties) {
-//    properties.add(String::format(taskPrefix "name", position), task->name);
-//    properties.add(String::format(taskPrefix "type", position), task->type());
-//    properties.add(String::format(taskPrefix "app", position), task->app);
-//    properties.add(String::format(taskPrefix "param", position), task->param);
-//    if (task->type() == "cycle") {
-//        auto *ct = dynamic_cast<const CycleTask *>(task);
-//        assert(ct != nullptr);
-//        properties.add(String::format(taskPrefix "interval", position), ct->interval);
-//    } else if (task->type() == "time") {
-//        auto *tt = dynamic_cast<const TimeTask *>(task);
-//        assert(tt != nullptr);
-//        properties.add(String::format(taskPrefix "time", position), tt->time);
-//        properties.add(String::format(taskPrefix "repeatType", position), tt->repeatType);
-//        properties.add(String::format(taskPrefix "repeatValue", position), tt->repeatValue);
-//    }
+bool TaskService::loadData() {
+    ServiceFactory *factory = ServiceFactory::instance();
+    assert(factory);
+    auto cs = factory->getService<IConfigService>();
+    assert(cs);
+
+    String type;
+    cs->getProperty("summer.task.type", type);
+    if (String::equals(type, "file", true)) {
+        // load yml file.
+        String path = Application::instance()->rootPath();
+        String name = cs->getProperty("summer.task.file.name");
+        String fileName = Path::combine(path, String::format("%s.yml", name.c_str()));
+        return YmlNode::loadFile(fileName, _properties);
+    } else if (String::equals(type, "database", true)) {
+        // load from database.
+#define databasePrefix "summer.task.database."
+        String userName;
+        if (!cs->getProperty(databasePrefix "username", userName))
+            return false;
+        if (userName.isNullOrEmpty()) {
+            Trace::error("task database user name is incorrect.");
+            return false;
+        }
+        String password;
+        if (!cs->getProperty(databasePrefix "password", password)) {
+            Trace::error("task database password is incorrect.");
+            return false;
+        }
+
+        String urlStr = cs->getProperty(databasePrefix "url");
+        DbClient *client = DataSourceService::open(urlStr, userName, password);
+        if (client != nullptr) {
+            _dbClient = client;
+            String sql = String::format("select * from %s", _table.name().c_str());
+            return _dbClient->executeSqlQuery(sql, _table);
+        } else {
+            Trace::error("task database url is incorrect.");
+            return false;
+        }
+    }
+    return false;
 }
 
-void TaskService::updateYmlProperties(bool enable, int position, YmlNode::Properties &properties) {
-    properties.add(String::format(taskPrefix "enable", position), enable);
+bool TaskService::saveData(const Crontab *crontab) {
+    Crontabs crontabs(false);
+    crontabs.add(crontab);
+    return saveData(crontabs);
+}
+
+bool TaskService::saveData(const Crontabs &crontabs) {
+    ServiceFactory *factory = ServiceFactory::instance();
+    assert(factory);
+    auto cs = factory->getService<IConfigService>();
+    assert(cs);
+
+    String type;
+    cs->getProperty("summer.task.type", type);
+    if (String::equals(type, "file", true)) {
+        // save yml file.
+        String path = Application::instance()->rootPath();
+        String name = cs->getProperty("summer.task.file.name");
+        String fileName = Path::combine(path, String::format("%s.yml", name.c_str()));
+        saveData(_crontabs, _properties);
+        return YmlNode::saveFile(fileName, _properties);
+    } else if (String::equals(type, "database", true)) {
+        // insert or replace to database.
+        saveData(crontabs, _table);
+        if (_dbClient != nullptr) {
+            return _dbClient->executeSqlReplace(_table);
+        }
+    }
+    return false;
+}
+
+void TaskService::saveData(const Crontabs &crontabs, YmlNode::Properties &properties) {
+    properties.clear();
+    for (size_t i = 0; i < crontabs.count(); ++i) {
+        const Crontab *crontab = crontabs[i];
+        saveData(crontab, i, properties);
+    }
+}
+
+void TaskService::saveData(const Crontab *crontab, int position, YmlNode::Properties &properties) {
+    properties.add(String::format(taskPrefix "name", position), crontab->name());
+    {
+        String type = crontab->schedule()->type();
+        properties.add(String::format(schedulePrefix "type", position), type);
+        if (type == "cycle") {
+            auto cycle = dynamic_cast<const CycleSchedule *>(crontab->schedule());
+            assert(cycle);
+            properties.add(String::format(schedulePrefix "interval", position), cycle->interval());
+        } else if (type == "timing") {
+            auto timing = dynamic_cast<const TimingSchedule *>(crontab->schedule());
+            assert(timing);
+            properties.add(String::format(schedulePrefix "time", position), timing->toTimeStr());
+            properties.add(String::format(schedulePrefix "repeat.type", position), timing->repeatType());
+            properties.add(String::format(schedulePrefix "repeat.value", position), timing->repeatValue());
+        }
+    }
+    {
+        String type = crontab->execution()->type();
+        properties.add(String::format(executionPrefix "type", position), type);
+        properties.add(String::format(executionPrefix "sync.enable", position), crontab->execution()->sync());
+        properties.add(String::format(executionPrefix "sync.timeout", position), crontab->execution()->timeout());
+        if (type == "app") {
+            auto app = dynamic_cast<const AppExecution *>(crontab->execution());
+            assert(app);
+            properties.add(String::format(executionPrefix "app", position), app->app());
+            properties.add(String::format(executionPrefix "param", position), app->param());
+        } else if (type == "sql") {
+            auto sql = dynamic_cast<const SqlExecution *>(crontab->execution());
+            assert(sql);
+            if (!sql->isFile()) {
+                properties.add(String::format(executionPrefix "sql", position), sql->sql());
+            } else {
+                properties.add(String::format(executionPrefix "file", position), sql->fileName());
+            }
+        } else if (type == "python") {
+            auto python = dynamic_cast<const PythonExecution *>(crontab->execution());
+            assert(python);
+            if (!python->isFile()) {
+                properties.add(String::format(executionPrefix "script", position), python->script());
+            } else {
+                properties.add(String::format(executionPrefix "file", position), python->fileName());
+                properties.add(String::format(executionPrefix "param", position), python->param());
+            }
+        }
+    }
+}
+
+void TaskService::saveData(const Crontabs &crontabs, DataTable &table) {
+    for (size_t i = 0; i < crontabs.count(); ++i) {
+        const Crontab *crontab = crontabs[i];
+        saveData(crontab, table);
+    }
+}
+
+void TaskService::saveData(const Crontab *crontab, DataTable &table) {
+    bool found = false;
+    String replaceId;
+    for (size_t i = 0; i < table.rowCount(); ++i) {
+        const DataRow &row = table.rows()[i];
+        const DataCells &cells = row.cells();
+        if (crontab->name() == cells["name"].valueStr()) {
+            found = true;
+            replaceId = row.cells()["id"].valueStr();
+            table.removeRow(i);
+            break;
+        }
+    }
+
+    const DataColumns &columns = table.columns();
+    DataRow row = {
+            DataCell(columns["id"], found ? replaceId : UInt64(DbClient::generateSnowFlakeId()).toString()),
+            DataCell(columns["name"], crontab->name()),
+            DataCell(columns["schedule"], crontab->schedule()->toString()),
+            DataCell(columns["execution"], crontab->execution()->toString())
+    };
+    table.addRow(row);
 }
 
 const YmlNode::Properties &TaskService::properties() const {
@@ -551,24 +724,4 @@ bool TaskService::updateConfigFile(const YmlNode::Properties &properties) {
         }
     }
     return result;
-}
-
-bool TaskService::loadData() {
-    ServiceFactory *factory = ServiceFactory::instance();
-    assert(factory);
-    auto cs = factory->getService<IConfigService>();
-    assert(cs);
-
-    String type;
-    cs->getProperty("summer.task.type", type);
-    if (String::equals(type, "file", true)) {
-        // load yml file.
-        String path = Application::instance()->rootPath();
-        String name = cs->getProperty("summer.task.file.name");
-        String fileName = Path::combine(path, String::format("%s.yml", name.c_str()));
-        return YmlNode::loadFile(fileName, _properties);
-    } else if (String::equals(type, "database", true)) {
-        // todo: load from database.
-    }
-    return false;
 }

@@ -46,7 +46,7 @@ private:
 
     HttpStatus onAddTask(const HttpRequest &request, HttpResponse &response);
 
-    HttpStatus onAddTaskApp(const HttpRequest &request, HttpResponse &response);
+    HttpStatus onAddTaskFile(const HttpRequest &request, HttpResponse &response);
 
     HttpStatus onRemoveTask(const HttpRequest &request, HttpResponse &response);
 

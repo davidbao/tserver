@@ -24,41 +24,80 @@ using namespace System;
 
 class Execution {
 public:
-    Execution() = default;
+    explicit Execution(bool sync, const TimeSpan &timeout);
 
     virtual ~Execution() = default;
+
+    virtual String type() const = 0;
+
+    bool sync() const;
+
+    const TimeSpan &timeout() const;
 
     virtual bool execute() = 0;
 
     virtual JsonNode toJsonNode() const = 0;
+
+    virtual void removeFile();
+
+    virtual bool checkFile(const String &md5) const;
+
+    virtual String currentFile() const = 0;
+
+    String currentPath() const;
+
+    String toString() const;
+
+protected:
+    bool _sync;
+    TimeSpan _timeout;
 };
 
 class AppExecution : public Execution {
 public:
-    explicit AppExecution(const String &path, const String &app, const String &param);
+    explicit AppExecution(bool sync, const TimeSpan &timeout,
+                          const String &app, const String &param);
 
     ~AppExecution() override = default;
+
+    String type() const override;
+
+    const String &app() const;
+
+    const String &param() const;
 
     bool execute() override;
 
     JsonNode toJsonNode() const override;
+
+protected:
+    String currentFile() const override;
 
 private:
     String _app;
     String _param;
-
-    String _path;
 };
 
 class SqlExecution : public Execution {
 public:
-    explicit SqlExecution(const String &text, bool sql);
+    explicit SqlExecution(bool sync, const TimeSpan &timeout, const String &text, bool sql);
 
     ~SqlExecution() override = default;
+
+    String type() const override;
+
+    const String &sql() const;
+
+    const String &fileName() const;
+
+    bool isFile() const;
 
     bool execute() override;
 
     JsonNode toJsonNode() const override;
+
+protected:
+    String currentFile() const override;
 
 private:
     String _sql;
@@ -67,15 +106,28 @@ private:
 
 class PythonExecution : public Execution {
 public:
-    explicit PythonExecution(const String &script);
+    explicit PythonExecution(bool sync, const TimeSpan &timeout, const String &script);
 
-    explicit PythonExecution(const String &fileName, const String &param);
+    explicit PythonExecution(bool sync, const TimeSpan &timeout, const String &fileName, const String &param);
 
     ~PythonExecution() override = default;
+
+    String type() const override;
+
+    const String &script() const;
+
+    const String &fileName() const;
+
+    const String &param() const;
+
+    bool isFile() const;
 
     bool execute() override;
 
     JsonNode toJsonNode() const override;
+
+protected:
+    String currentFile() const override;
 
 private:
     String _script;
@@ -90,9 +142,13 @@ public:
 
     virtual ~Schedule() = default;
 
+    virtual String type() const = 0;
+
     virtual bool isTimeUp() = 0;
 
     virtual JsonNode toJsonNode() const = 0;
+
+    String toString() const;
 };
 
 class CycleSchedule : public Schedule {
@@ -100,6 +156,10 @@ public:
     explicit CycleSchedule(const TimeSpan &interval);
 
     ~CycleSchedule() override = default;
+
+    String type() const override;
+
+    const TimeSpan &interval() const;
 
     bool isTimeUp() override;
 
@@ -117,9 +177,32 @@ public:
 
     ~TimingSchedule() override = default;
 
+    String type() const override;
+
+    const DateTime &time() const;
+
+    const String &repeatType() const;
+
+    const String &repeatValue() const;
+
     bool isTimeUp() override;
 
     JsonNode toJsonNode() const override;
+
+    String toTimeStr() const;
+
+private:
+    enum Types {
+        S = 0,      // second
+        MS = 1,     // minute + second
+        HM = 2,     // hour + minute
+        DHM = 3,    // day + hour + minute
+        MDHM = 4    // month + day + hour + minute
+    };
+
+    bool isTimeUp(Types type);
+
+    bool isTimeUp(const DateTime &now, const DateTime &time, const TimeSpan &deadZone);
 
 public:
     static StringArray allRepeatTypes();
@@ -140,15 +223,25 @@ private:
 
     uint32_t _tickSeconds;
     uint32_t _tickMinutes;
+
+    uint32_t _lastTimeUpTick;
+
+private:
+    static const TimeSpan MinDeadZone;
+    static const TimeSpan SecDeadZone;
 };
 
-class Task {
+class Crontab {
 public:
-    explicit Task(const String &name, Schedule *schedule, Execution *execution);
+    explicit Crontab(const String &name, Schedule *schedule, Execution *execution);
 
-    ~Task();
+    ~Crontab();
 
     const String &name() const;
+
+    const Schedule *schedule() const;
+
+    const Execution *execution() const;
 
     bool isTimeUp();
 
@@ -158,12 +251,21 @@ public:
 
     JsonNode toJsonNode() const;
 
+    void removeFile();
+
+    bool isValid() const;
+
+public:
+    static bool parseSchedule(const String &str, Schedule *&schedule);
+
+    static bool parseExecution(const String &str, Execution *&execution);
+
 private:
     String _name;
     Schedule *_schedule;
     Execution *_execution;
 };
 
-typedef PList<Task> Tasks;
+typedef PList<Crontab> Crontabs;
 
 #endif //TSERVER_TASKCONTEXT_H
