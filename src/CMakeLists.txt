@@ -114,7 +114,12 @@ if (MAC_OS)
 endif ()
 
 set(MAIN_SRC main.cpp AppStarter.cpp AdminService.cpp ExcService.cpp Style.cpp TaskService.cpp WebService.cpp)
-set(EXCHANGE_SRC exchanges/ExcDbProvider.cpp exchanges/ExcSimProvider.cpp exchanges/ExcContext.cpp)
+set(EXCHANGE_SRC exchanges/ExcContext.cpp
+        exchanges/ExcDbProvider.cpp
+        exchanges/ExcSimCache.cpp
+        exchanges/ExcSimContext.cpp
+        exchanges/ExcSimStorage.cpp
+        exchanges/ExcSimProvider.cpp)
 set(TASK_SRC tasks/TaskContext.cpp tasks/TaskDbService.cpp)
 
 add_executable(tserver ${MAIN_SRC} ${EXCHANGE_SRC} ${TASK_SRC})

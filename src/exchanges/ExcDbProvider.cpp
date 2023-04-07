@@ -41,7 +41,7 @@ void ExcDbProvider::createSqlFile(const String &fileName, const String &sql) {
 }
 
 FetchResult ExcDbProvider::getLabelValues(const String &labelName, const StringArray &tagNames,
-                                          const SqlSelectFilter &filter, StringMap &values) {
+                                          const SqlSelectFilter &filter, VariantMap &values) {
     DbClient *dbClient = this->dbClient();
     if (dbClient == nullptr)
         return FetchResult::DbError;
@@ -73,8 +73,7 @@ FetchResult ExcDbProvider::getLabelValues(const String &labelName, const StringA
             for (size_t j = 0; j < tagNames.count(); j++) {
                 const String &key = tagNames[j];
                 if (cell.matchColumnName(key)) {
-                    String value = cell.value().valueStr();
-                    values.add(key, value);
+                    values.add(cell.columnName(), cell.value());
                 }
             }
         }
@@ -126,33 +125,29 @@ String ExcDbProvider::getSqlFileName(const String &name, int sqlIndex) {
     assert(cs);
 
     String subPath;
-    cs->getProperty("summer.exchange.database.path", subPath);
+    cs->getProperty(DatabasePrefix "path", subPath);
 
     String sqlFileName;
     if (sqlIndex == 0) {
-#define maxLabelCount 1000
-#define labelPrefix "summer.exchange.database.labels[%d]."
-        for (int i = 0; i < maxLabelCount; i++) {
+        for (int i = 0; i < MaxLabelCount; i++) {
             String n;
-            if (!cs->getProperty(String::format(labelPrefix "name", i), n)) {
+            if (!cs->getProperty(String::format(DbLabelPrefix "name", i), n)) {
                 break;
             }
             if (name == n) {
-                if (cs->getProperty(String::format(labelPrefix "sql", i), sqlFileName)) {
+                if (cs->getProperty(String::format(DbLabelPrefix "sql", i), sqlFileName)) {
                     break;
                 }
             }
         }
     } else {
-#define maxTableCount 1000
-#define tablePrefix "summer.exchange.database.tables[%d]."
-        for (int i = 0; i < maxTableCount; i++) {
+        for (int i = 0; i < MaxTableCount; i++) {
             String n;
-            if (!cs->getProperty(String::format(tablePrefix "name", i), n)) {
+            if (!cs->getProperty(String::format(DbTablePrefix "name", i), n)) {
                 break;
             }
             if (name == n) {
-                const char *fmt = sqlIndex == 1 ? (tablePrefix "querySql") : (tablePrefix "countSql");
+                const char *fmt = sqlIndex == 1 ? (DbTablePrefix "querySql") : (DbTablePrefix "countSql");
                 if (cs->getProperty(String::format(fmt, i), sqlFileName)) {
                     break;
                 }
@@ -193,6 +188,6 @@ String ExcDbProvider::getTablePrefix() {
     assert(cs);
 
     String prefix;
-    cs->getProperty("summer.exchange.database.table.prefix", prefix);
+    cs->getProperty(DatabasePrefix "table.prefix", prefix);
     return prefix;
 }

@@ -7,6 +7,9 @@
 //
 
 #include "Style.h"
+#include "json/JsonNode.h"
+
+using namespace Json;
 
 Style::Style() = default;
 
@@ -43,22 +46,24 @@ bool Style::isEmpty() const {
 }
 
 String Style::toString() const {
-    String result;
-    if (_values.count() == 1) {
-        if (_values.at(String::Empty, result)) {
-            return result;
-        }
+    if (_values.count() == 0) {
+        return String::Empty;
     }
-
-    for (auto it = _values.begin(); it != _values.end(); ++it) {
-        const String &k = it.key();
-        const String &v = it.value();
-        if (!result.isNullOrEmpty()) {
-            result.append(';');
-        }
-        result.append(String::format("%s:%s", k.c_str(), v.c_str()));
+    else if (_values.count() == 1) {
+        return _values[String::Empty];
+    } else {
+        JsonNode node("style", _values);
+        return node.toString();
     }
-    return result;
+//    for (auto it = _values.begin(); it != _values.end(); ++it) {
+//        const String &k = it.key();
+//        const String &v = it.value();
+//        if (!result.isNullOrEmpty()) {
+//            result.append(';');
+//        }
+//        result.append(String::format("%s:%s", k.c_str(), v.c_str()));
+//    }
+//    return result;
 }
 
 void Style::addRange(const Style &style) {
@@ -67,7 +72,6 @@ void Style::addRange(const Style &style) {
 
 bool Style::containsVar(const String &varName) const {
     for (auto it = _values.begin(); it != _values.end(); ++it) {
-//        const String &k = it.key();
         const String &v = it.value();
         if (v.find(String::format("$%s", varName.c_str())) >= 0) {
             return true;
@@ -81,34 +85,41 @@ bool Style::parse(const String &str, Style &style) {
         return false;
     }
 
-    StringArray texts;
-    StringArray::parse(str, texts, ';');
-    for (size_t i = 0; i < texts.count(); ++i) {
-//        char keyStr[255] = {0}, valueStr[255] = {0};
-        const String &text = texts[i];
-        ssize_t pos = text.find(':');
-        if (pos > 0) {
-            String key = text.substr(0, pos).trim('\'', '"', ' ');
-            pos++;  // skip :
-            String value = text.substr(pos, text.length() - pos).trim(' ', '\"');
-            if (!key.isNullOrEmpty()) {
+    JsonNode node;
+    if (JsonNode::parse(str, node)) {
+        if (node.type() == JsonNode::TypeNode) {
+            StringArray names;
+            node.getAttributeNames(names);
+            for (size_t i = 0; i < names.count(); ++i) {
+                const String &key = names[i];
+                String value = node.getAttribute(key);
                 style._values.add(key, value);
             }
         } else {
-            return false;
+            style._values.add(String::Empty, str);
         }
-//        int rValue = sscanf(text, "%[a-z|A-Z|0-9]:%s", keyStr, valueStr);
-//        if (rValue >= 2) {
-//            String key = String::trim(keyStr, '\'', '"', ' ');
-//            String value = String::trim(valueStr, '\'', '"', ' ');
-//            if (!key.isNullOrEmpty()) {
-//                style._values.add(key, value);
-//            }
-//        } else if(rValue == 1) {
-//            style._values.add(String::Empty, text);
-//        } else {
-//            return false;
-//        }
+    } else {
+        StringArray texts;
+        StringArray::parse(str, texts, ';');
+        for (size_t i = 0; i < texts.count(); ++i) {
+            const String &text = texts[i];
+            ssize_t pos = text.find(':');
+            if (pos > 0) {
+                String key = text.substr(0, pos).trim('\'', '"', ' ');
+                pos++;  // skip :
+                String value = text.substr(pos, text.length() - pos).trim('\'', '"', ' ');
+                if (!key.isNullOrEmpty()) {
+                    style._values.add(key, value);
+                }
+            } else {
+                if (texts.count() == 1) {
+                    style._values.add(String::Empty, str);
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+        }
     }
     return style._values.count() > 0;
 }

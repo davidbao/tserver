@@ -99,7 +99,7 @@ FetchResult ExcService::getLabelValues(const JsonNode &request, JsonNode &respon
                 node.getAttribute("tags", tags);
                 SqlSelectFilter filter(1, 1);
                 SqlSelectFilter::parse(node["condition"].toString(), filter);
-                StringMap values;
+                VariantMap values;
                 FetchResult result = provider->getLabelValues(name, tags, filter, values);
                 JsonNode iNode("item");
                 iNode.add(JsonNode("name", name));
@@ -238,6 +238,7 @@ bool ExcService::getLabel(const StringMap &request, StringMap &response) {
     if (esp != nullptr) {
         return esp->getLabel(request, response);
     }
+    response.addRange(HttpCode::at(ExchangeTypeNotSimulator));
     return false;
 }
 
@@ -246,6 +247,7 @@ bool ExcService::addLabel(const StringMap &request, StringMap &response) {
     if (esp != nullptr) {
         return esp->addLabel(request, response);
     }
+    response.addRange(HttpCode::at(ExchangeTypeNotSimulator));
     return false;
 }
 
@@ -254,6 +256,7 @@ bool ExcService::removeLabel(const StringMap &request, StringMap &response) {
     if (esp != nullptr) {
         return esp->removeLabel(request, response);
     }
+    response.addRange(HttpCode::at(ExchangeTypeNotSimulator));
     return false;
 }
 
@@ -262,6 +265,7 @@ bool ExcService::updateLabel(const StringMap &request, StringMap &response) {
     if (esp != nullptr) {
         return esp->updateLabel(request, response);
     }
+    response.addRange(HttpCode::at(ExchangeTypeNotSimulator));
     return false;
 }
 
@@ -279,6 +283,7 @@ bool ExcService::getTable(const StringMap &request, StringMap &response) {
     if (esp != nullptr) {
         return esp->getTable(request, response);
     }
+    response.addRange(HttpCode::at(ExchangeTypeNotSimulator));
     return false;
 }
 
@@ -287,6 +292,7 @@ bool ExcService::addTable(const StringMap &request, StringMap &response) {
     if (esp != nullptr) {
         return esp->addTable(request, response);
     }
+    response.addRange(HttpCode::at(ExchangeTypeNotSimulator));
     return false;
 }
 
@@ -295,6 +301,7 @@ bool ExcService::removeTable(const StringMap &request, StringMap &response) {
     if (esp != nullptr) {
         return esp->removeTable(request, response);
     }
+    response.addRange(HttpCode::at(ExchangeTypeNotSimulator));
     return false;
 }
 
@@ -303,5 +310,6 @@ bool ExcService::updateTable(const StringMap &request, StringMap &response) {
     if (esp != nullptr) {
         return esp->updateTable(request, response);
     }
+    response.addRange(HttpCode::at(ExchangeTypeNotSimulator));
     return false;
 }

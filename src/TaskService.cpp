@@ -227,9 +227,9 @@ bool TaskService::getTasks(const SqlSelectFilter &filter, DataTable &table) {
     table.setName("task");
     table.setTotalCount((int) match.count());
     table.addColumns({
-                             DataColumn("name", ValueTypes::Text, true),
-                             DataColumn("schedule", ValueTypes::Text, false),
-                             DataColumn("execution", ValueTypes::Text, false)
+                             DataColumn("name", DbType::Text, true),
+                             DataColumn("schedule", DbType::Text, false),
+                             DataColumn("execution", DbType::Text, false)
                      });
     size_t offset = Math::max(0, filter.offset());
     size_t count = Math::min((int) match.count(), filter.offset() + filter.limit());
@@ -339,8 +339,7 @@ bool TaskService::addTaskFile(const StringMap &request, StringMap &response) {
         }
     } else {
         // not a zip file.
-        String destFileName = file;
-        if (!File::copy(fullFileName, destFileName, true)) {
+        if (!File::copy(fullFileName, file, true)) {
             // Can not copy the file.
             response.addRange(HttpCode::at(CannotCopyApp));
             return false;
@@ -546,21 +545,21 @@ bool TaskService::loadData() {
         return YmlNode::loadFile(fileName, _properties);
     } else if (String::equals(type, "database", true)) {
         // load from database.
-#define databasePrefix "summer.task.database."
+#define DatabasePrefix "summer.task.database."
         String userName;
-        if (!cs->getProperty(databasePrefix "username", userName))
+        if (!cs->getProperty(DatabasePrefix "username", userName))
             return false;
         if (userName.isNullOrEmpty()) {
             Trace::error("task database user name is incorrect.");
             return false;
         }
         String password;
-        if (!cs->getProperty(databasePrefix "password", password)) {
+        if (!cs->getProperty(DatabasePrefix "password", password)) {
             Trace::error("task database password is incorrect.");
             return false;
         }
 
-        String urlStr = cs->getProperty(databasePrefix "url");
+        String urlStr = cs->getProperty(DatabasePrefix "url");
         DbClient *client = DataSourceService::open(urlStr, userName, password);
         if (client != nullptr) {
             _dbClient = client;
@@ -613,7 +612,7 @@ void TaskService::saveData(const Crontabs &crontabs, YmlNode::Properties &proper
     }
 }
 
-void TaskService::saveData(const Crontab *crontab, int position, YmlNode::Properties &properties) {
+void TaskService::saveData(const Crontab *crontab, size_t position, YmlNode::Properties &properties) {
     properties.add(String::format(taskPrefix "name", position), crontab->name());
     {
         String type = crontab->schedule()->type();

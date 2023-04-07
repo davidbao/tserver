@@ -23,7 +23,7 @@ public:
     ~ExcDbProvider() override;
 
     FetchResult getLabelValues(const String &labelName, const StringArray &tagNames,
-                               const SqlSelectFilter &filter, StringMap &values) override;
+                               const SqlSelectFilter &filter, VariantMap &values) override;
 
     FetchResult getTableValues(const String &tableName, const StringArray &colNames,
                                const SqlSelectFilter &filter, DataTable &table) override;
@@ -40,6 +40,15 @@ private:
     static String getSql(const String &name, int sqlIndex);
 
     static String getTablePrefix();
+
+private:
+#define DatabasePrefix "summer.exchange.database."
+
+#define MaxLabelCount 1000
+#define DbLabelPrefix DatabasePrefix "labels[%d]."
+
+#define MaxTableCount 1000
+#define DbTablePrefix DatabasePrefix "tables[%d]."
 };
 
 

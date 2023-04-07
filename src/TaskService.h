@@ -72,7 +72,7 @@ private:
 private:
     static void saveData(const Crontabs &crontabs, YmlNode::Properties &properties);
 
-    static void saveData(const Crontab *crontab, int position, YmlNode::Properties &properties);
+    static void saveData(const Crontab *crontab, size_t position, YmlNode::Properties &properties);
 
     static void saveData(const Crontabs &crontabs, DataTable &table);
 

@@ -9,174 +9,22 @@
 #ifndef TSERVER_EXCSIMPROVIDER_H
 #define TSERVER_EXCSIMPROVIDER_H
 
-#include "ExcContext.h"
-#include "data/Variant.h"
-#include "thread/Timer.h"
-#include "system/ServiceFactory.h"
 #include "configuration/ConfigService.h"
+#include "ExcContext.h"
+#include "ExcSimContext.h"
 
 using namespace Data;
 using namespace System;
 using namespace Config;
 
-class ExcSimProvider : public IExcProvider, public IConfigService {
+class ExcSimProvider : public IExcProvider {
 public:
-    class Label;
-
-    class Tag : public IEvaluation<Tag>, public IEquatable<Tag> {
-    public:
-        String name;
-        String registerStr;
-        String style;
-        Variant value;
-
-        explicit Tag(const String &registerStr = String::Empty);
-
-        Tag(const Tag &tag);
-
-        bool equals(const Tag &other) const override;
-
-        void evaluates(const Tag &other) override;
-
-        void runOnce(const Label *label);
-
-        String getValue(const SqlSelectFilter &filter) const;
-
-    private:
-        static bool parseDoubleStyle(const String &style, double &minValue, double &maxValue, double &step);
-
-    private:
-        double _oldValue;
-    };
-
-    typedef List<Tag> Tags;
-
-    class Label : public IEvaluation<Label>, public IEquatable<Label> {
-    public:
-        String name;
-        double minValue;
-        double maxValue;
-        double step;
-        TimeSpan interval;
-        Tags tags;
-
-        Label();
-
-        Label(const Label &label);
-
-        bool equals(const Label &other) const override;
-
-        void evaluates(const Label &other) override;
-
-        bool isTimeUp();
-
-        DataRow toDataRow(const DataTable &table) const;
-
-        String toRangeStr() const;
-
-        String toTagsStr() const;
-
-        bool findName(const String &n) const;
-
-        bool findTagName(const String &tagNames) const;
-
-        JsonNode toJsonNode() const;
-
-    public:
-        static bool parseRange(const String &str, double &minValue, double &maxValue);
-
-        static bool parseTags(const String &str, Tags &tags);
-
-    private:
-        uint32_t _tick;
-    };
-
-    typedef List<Label> Labels;
-
-    class Table;
-
-    class Column : public IEvaluation<Column>, public IEquatable<Column> {
-    public:
-        String name;
-        String registerStr;
-        String style;
-        Variant value;
-
-        Column();
-
-        Column(const String &name, const String &registerStr, const String &style);
-
-        Column(const Column &Column);
-
-        bool equals(const Column &other) const override;
-
-        void evaluates(const Column &other) override;
-
-        bool getCellValue(const Table *table, const SqlSelectFilter &filter, int row, String &cellValue) const;
-
-    public:
-        static bool parseStyle(const String &str, String &style);
-
-    private:
-        static bool parseDoubleStyle(const String &style, double &minValue, double &maxValue, double &step);
-    };
-
-    class Columns : public List<Column> {
-    public:
-        Columns();
-
-        ~Columns() override;
-
-        bool contains(const StringArray &names) const;
-
-        bool atByName(const String &name, Column &column) const;
-    };
-
-    class Table : public IEvaluation<Table>, public IEquatable<Table> {
-    public:
-        String name;
-        double minValue;
-        double maxValue;
-        double step;
-        int rowCount;
-        Columns columns;
-
-        Table();
-
-        Table(const Table &table);
-
-        bool equals(const Table &other) const override;
-
-        void evaluates(const Table &other) override;
-
-        DataRow toDataRow(const DataTable &table) const;
-
-        String toRangeStr() const;
-
-        String toColumnsStr() const;
-
-        bool findName(const String &n) const;
-
-        bool findColumnName(const String &columnNames) const;
-
-        JsonNode toJsonNode() const;
-
-        bool getColumns(const StringArray &colNames, Columns &cols) const;
-
-    public:
-        static bool parseRange(const String &str, double &minValue, double &maxValue);
-
-        static bool parseColumns(const String &str, Columns &columns);
-    };
-
-    typedef List<Table> Tables;
-
     ExcSimProvider();
 
     ~ExcSimProvider() override;
 
     FetchResult getLabelValues(const String &labelName, const StringArray &tagNames,
-                               const SqlSelectFilter &filter, StringMap &values) override;
+                               const SqlSelectFilter &filter, VariantMap &values) override;
 
     FetchResult getTableValues(const String &tableName, const StringArray &colNames,
                                const SqlSelectFilter &filter, DataTable &dataTable) override;
@@ -204,56 +52,14 @@ public:
     bool updateTable(const StringMap &request, StringMap &response);
 
 private:
-    const YmlNode::Properties &properties() const final;
-
-    bool setProperty(const String &key, const String &value) final;
-
-    bool updateConfigFile(const YmlNode::Properties &properties) final;
-
     bool loadData();
 
-    void initLabels();
-
-    void initTables();
-
-    void startSimulator();
-
-    void stopSimulator();
-
-    void labelTimeUp();
-
-    bool addOrUpdateLabel(const StringMap &request, StringMap &response, int position = -1);
-
-    bool addOrUpdateTable(const StringMap &request, StringMap &response, int position = -1);
-
 private:
-    static void updateYmlProperties(const Label &label, int position, YmlNode::Properties &properties);
+#define SimulatorPrefix "summer.exchange.simulator."
 
-    static void updateLabelYmlProperties(bool enable, int position, YmlNode::Properties &properties);
+    IExcSimStorage *_storage;
 
-    static void updateYmlProperties(const Table &label, int position, YmlNode::Properties &properties);
-
-    static void updateTableYmlProperties(bool enable, int position, YmlNode::Properties &properties);
-
-private:
-#define simulatorPrefix "summer.exchange.simulator."
-
-#define maxLabelCount 1000
-#define labelPrefix "labels[%d]."
-#define maxTagCount 1000
-#define tagPrefix labelPrefix "tags[%d]."
-
-#define maxTableCount 1000
-#define tablePrefix "tables[%d]."
-#define maxColumnCount 100
-#define columnPrefix tablePrefix "columns[%d]."
-
-    Labels _labels;
-    Timer *_timer;
-
-    Tables _tables;
-
-    YmlNode::Properties _properties;
+    IExcSimCache *_cache;
 };
 
 

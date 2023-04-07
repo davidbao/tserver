@@ -36,7 +36,7 @@ public:
     virtual ~IExcProvider() = default;
 
     virtual FetchResult getLabelValues(const String &labelName, const StringArray &tagNames,
-                                       const SqlSelectFilter &filter, StringMap &values) = 0;
+                                       const SqlSelectFilter &filter, VariantMap &values) = 0;
 
     virtual FetchResult getTableValues(const String &tableName, const StringArray &colNames,
                                        const SqlSelectFilter &filter, DataTable &table) = 0;
