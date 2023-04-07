@@ -14,10 +14,33 @@
 #include "database/DataTable.h"
 #include "database/SqlSelectFilter.h"
 #include "../Style.h"
+#include <cassert>
 
 using namespace Data;
 using namespace Database;
 using namespace System;
+
+// for application.yml
+#define SimulatorPrefix "summer.exchange.simulator."
+#define SimDbPrefix SimulatorPrefix "database."
+
+// for yml file.
+#define MaxLabelCount 1000
+#define LabelPrefix "labels[%d]."
+#define MaxTagCount 1000
+#define TagPrefix LabelPrefix "tags[%d]."
+
+#define MaxTableCount 1000
+#define TablePrefix "tables[%d]."
+#define MaxColumnCount 100
+#define ColumnPrefix TablePrefix "columns[%d]."
+
+// for database.
+#define LabelTableName "sim_label"
+#define TagTableName "sim_tag"
+
+#define TableTableName "sim_table"
+#define ColumnTableName "sim_column"
 
 class Element;
 
@@ -158,17 +181,6 @@ private:
     static bool parseTags(const String &str, Tags &tags);
 
     static String getTableName(const String &prefix, const String &tableName);
-
-private:
-    // for yml file.
-#define MaxLabelCount 1000
-#define LabelPrefix "labels[%d]."
-#define MaxTagCount 1000
-#define TagPrefix LabelPrefix "tags[%d]."
-
-    // for database.
-#define LabelTableName "sim_label"
-#define TagTableName "sim_tag"
 };
 
 typedef List<Label> Labels;
@@ -255,17 +267,6 @@ private:
     static bool parseColumns(const String &str, Columns &columns);
 
     static String getTableName(const String &prefix, const String &tableName);
-
-private:
-    // for yml file.
-#define MaxTableCount 1000
-#define TablePrefix "tables[%d]."
-#define MaxColumnCount 100
-#define ColumnPrefix TablePrefix "columns[%d]."
-
-    // for database.
-#define TableTableName "sim_table"
-#define ColumnTableName "sim_column"
 };
 
 typedef List<Table> Tables;

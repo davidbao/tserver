@@ -16,17 +16,35 @@
 #include "database/SqlSelectFilter.h"
 #include "system/ServiceFactory.h"
 #include "../Style.h"
+#include <cassert>
 
 using namespace Data;
 using namespace Http;
 using namespace Database;
 using namespace System;
 
-class Execution {
+// for application.yml
+#define TaskPrefix "summer.task."
+#define SimDbPrefix TaskPrefix "database."
+
+// for yml file.
+#define MaxTaskCount 1000
+#define TasksPrefix "tasks[%d]."
+#define SchedulePrefix TasksPrefix "schedule."
+#define ExecutionPrefix TasksPrefix "execution."
+
+// for database.
+#define TaskTableName "task"
+
+class Execution : public IEvaluation<Execution>, public IEquatable<Execution>, public ICloneable<Execution> {
 public:
+    Execution();
+
     explicit Execution(bool sync, const TimeSpan &timeout);
 
-    virtual ~Execution() = default;
+    bool equals(const Execution &other) const override;
+
+    void evaluates(const Execution &other) override;
 
     virtual String type() const = 0;
 
@@ -44,7 +62,7 @@ public:
 
     virtual String currentFile() const = 0;
 
-    String currentPath() const;
+    static String currentPath();
 
     String toString() const;
 
@@ -55,10 +73,18 @@ protected:
 
 class AppExecution : public Execution {
 public:
+    AppExecution() = default;
+
     explicit AppExecution(bool sync, const TimeSpan &timeout,
                           const String &app, const String &param);
 
     ~AppExecution() override = default;
+
+    bool equals(const Execution &other) const override;
+
+    void evaluates(const Execution &other) override;
+
+    Execution *clone() const override;
 
     String type() const override;
 
@@ -80,9 +106,18 @@ private:
 
 class SqlExecution : public Execution {
 public:
-    explicit SqlExecution(bool sync, const TimeSpan &timeout, const String &text, bool sql);
+    SqlExecution() = default;
+
+    explicit SqlExecution(bool sync, const TimeSpan &timeout,
+                          const String &text, bool sql);
 
     ~SqlExecution() override = default;
+
+    bool equals(const Execution &other) const override;
+
+    void evaluates(const Execution &other) override;
+
+    Execution *clone() const override;
 
     String type() const override;
 
@@ -106,11 +141,21 @@ private:
 
 class PythonExecution : public Execution {
 public:
-    explicit PythonExecution(bool sync, const TimeSpan &timeout, const String &script);
+    PythonExecution() = default;
 
-    explicit PythonExecution(bool sync, const TimeSpan &timeout, const String &fileName, const String &param);
+    explicit PythonExecution(bool sync, const TimeSpan &timeout,
+                             const String &script);
+
+    explicit PythonExecution(bool sync, const TimeSpan &timeout,
+                             const String &fileName, const String &param);
 
     ~PythonExecution() override = default;
+
+    bool equals(const Execution &other) const override;
+
+    void evaluates(const Execution &other) override;
+
+    Execution *clone() const override;
 
     String type() const override;
 
@@ -136,15 +181,13 @@ private:
     String _param;
 };
 
-class Schedule {
+class Schedule : public IEvaluation<Schedule>, public IEquatable<Schedule>, public ICloneable<Schedule> {
 public:
     Schedule() = default;
 
-    virtual ~Schedule() = default;
-
     virtual String type() const = 0;
 
-    virtual bool isTimeUp() = 0;
+    virtual bool isTimeUp(const String &taskName) = 0;
 
     virtual JsonNode toJsonNode() const = 0;
 
@@ -153,29 +196,43 @@ public:
 
 class CycleSchedule : public Schedule {
 public:
+    CycleSchedule() = default;
+
     explicit CycleSchedule(const TimeSpan &interval);
 
     ~CycleSchedule() override = default;
+
+    bool equals(const Schedule &other) const override;
+
+    void evaluates(const Schedule &other) override;
+
+    Schedule *clone() const override;
 
     String type() const override;
 
     const TimeSpan &interval() const;
 
-    bool isTimeUp() override;
+    bool isTimeUp(const String &taskName) override;
 
     JsonNode toJsonNode() const override;
 
 private:
     TimeSpan _interval;
-
-    uint32_t _tick;
 };
 
 class TimingSchedule : public Schedule {
 public:
+    TimingSchedule() = default;
+
     TimingSchedule(const DateTime &time, const String &repeatType, const String &repeatValue);
 
     ~TimingSchedule() override = default;
+
+    bool equals(const Schedule &other) const override;
+
+    void evaluates(const Schedule &other) override;
+
+    Schedule *clone() const override;
 
     String type() const override;
 
@@ -185,7 +242,7 @@ public:
 
     const String &repeatValue() const;
 
-    bool isTimeUp() override;
+    bool isTimeUp(const String &taskName) override;
 
     JsonNode toJsonNode() const override;
 
@@ -200,9 +257,9 @@ private:
         MDHM = 4    // month + day + hour + minute
     };
 
-    bool isTimeUp(Types type);
+    bool isTimeUp(const String &taskName, Types type);
 
-    bool isTimeUp(const DateTime &now, const DateTime &time, const TimeSpan &deadZone);
+    static bool isTimeUp(const String &taskName, const DateTime &now, const DateTime &time, const TimeSpan &deadZone);
 
 public:
     static StringArray allRepeatTypes();
@@ -221,23 +278,29 @@ private:
     String _repeatType;
     String _repeatValue;
 
-    uint32_t _tickSeconds;
-    uint32_t _tickMinutes;
-
-    uint32_t _lastTimeUpTick;
-
 private:
     static const TimeSpan MinDeadZone;
     static const TimeSpan SecDeadZone;
 };
 
-class Crontab {
+class Crontab : public IEvaluation<Crontab>, public IEquatable<Crontab> {
 public:
+    String name;
+    bool enable;
+
+    Crontab();
+
     explicit Crontab(const String &name, Schedule *schedule, Execution *execution);
 
-    ~Crontab();
+    Crontab(const Crontab &other);
 
-    const String &name() const;
+    ~Crontab() override;
+
+    bool equals(const Crontab &other) const override;
+
+    void evaluates(const Crontab &other) override;
+
+    Crontab &operator=(const Crontab &other);
 
     const Schedule *schedule() const;
 
@@ -255,17 +318,75 @@ public:
 
     bool isValid() const;
 
+    bool findName(const String &n) const;
+
+    void updateYmlProperties(YmlNode::Properties &properties, int pos) const;
+
+    static void removeYmlProperties(YmlNode::Properties &properties, int pos) ;
+
+    String toInsertSqlStr(const String &prefix) const;
+
+    String toReplaceSqlStr(const String &prefix) const;
+
 public:
+    static bool parse(const StringMap &request, Crontab &crontab);
+
+    static bool parse(const YmlNode::Properties &properties, int pos, Crontab &crontab);
+
+    static bool parse(const DataRow &row, Crontab &crontab);
+
+    static String toSelectSqlStr(const String &prefix, const String &name);
+
+    static String toSelectSqlStr(const String &prefix, int offset);
+
+    static String toSelectSqlStr(const String &prefix, const SqlSelectFilter &filter);
+
+    static String toCountSqlStr(const String &prefix, const SqlSelectFilter &filter);
+
+    static String toDeleteSqlStr(const String &prefix, const String &taskName);
+
+private:
     static bool parseSchedule(const String &str, Schedule *&schedule);
 
     static bool parseExecution(const String &str, Execution *&execution);
 
+    static String getTableName(const String &prefix, const String &tableName);
+
 private:
-    String _name;
     Schedule *_schedule;
     Execution *_execution;
 };
 
-typedef PList<Crontab> Crontabs;
+typedef List<Crontab> Crontabs;
+
+class ITaskStorage {
+public:
+    ITaskStorage() = default;
+
+    virtual ~ITaskStorage() = default;
+
+    virtual bool load() = 0;
+
+    virtual bool getTask(const String &name, Crontab &crontab) = 0;
+
+    virtual bool getTask(int pos, Crontab &crontab) = 0;
+
+    virtual bool getTasks(const SqlSelectFilter &filter, DataTable &table) = 0;
+
+    virtual bool addTask(const StringMap &request, StringMap &response) = 0;
+
+    virtual bool updateTask(const StringMap &request, StringMap &response) = 0;
+
+    virtual bool removeTask(const StringMap &request, StringMap &response) = 0;
+};
+
+class ITaskCache : public IService {
+public:
+    ITaskCache() = default;
+
+    virtual String getValue(const String &key) = 0;
+
+    virtual bool setValue(const String &key, const String &value) = 0;
+};
 
 #endif //TSERVER_TASKCONTEXT_H

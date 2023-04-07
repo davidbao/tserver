@@ -55,8 +55,6 @@ private:
     bool loadData();
 
 private:
-#define SimulatorPrefix "summer.exchange.simulator."
-
     IExcSimStorage *_storage;
 
     IExcSimCache *_cache;

@@ -13,6 +13,7 @@
 #include "http/HttpContent.h"
 #include "database/DataTable.h"
 #include "database/SqlSelectFilter.h"
+#include <cassert>
 
 using namespace Data;
 using namespace Http;

@@ -120,7 +120,11 @@ set(EXCHANGE_SRC exchanges/ExcContext.cpp
         exchanges/ExcSimContext.cpp
         exchanges/ExcSimStorage.cpp
         exchanges/ExcSimProvider.cpp)
-set(TASK_SRC tasks/TaskContext.cpp tasks/TaskDbService.cpp)
+set(TASK_SRC tasks/TaskCache.cpp
+        tasks/TaskContext.cpp
+        tasks/TaskDbService.cpp
+        tasks/TaskStorage.cpp
+        tasks/TimerService.cpp)
 
 add_executable(tserver ${MAIN_SRC} ${EXCHANGE_SRC} ${TASK_SRC})
 target_link_libraries(tserver ${TSERVER_LIB})

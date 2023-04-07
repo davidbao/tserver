@@ -94,9 +94,6 @@ private:
     static String getTableName(const String &tableName);
 
 private:
-#define SimulatorPrefix "summer.exchange.simulator."
-#define DatabasePrefix SimulatorPrefix "database."
-
     DbClient *_dbClient;
 };
 

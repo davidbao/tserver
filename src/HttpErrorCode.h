@@ -35,6 +35,7 @@ enum HttpErrorCode {
     RepeatInvalid = 67,             // Repeat type is invalid.
     CannotFindScheduleType = 68,    // Can not find schedule type.
     CannotFindExecutionType = 69,   // Can not find execution type.
+    CannotFindTaskType = 70,        // Can not find task type.
 
     // web
     CannotFindWWWBundlePath = 81,   // Can not find www bundle path.
@@ -68,6 +69,9 @@ public:
                                        {RepeatInvalid,            "Repeat type is invalid."},
                                        {CannotFindScheduleType,   "Can not find schedule type."},
                                        {CannotFindExecutionType,  "Can not find execution type."},
+                                       {CannotFindTaskType,       "Can not find task type."},
+                                       {CannotFindWWWBundlePath,  "Can not find www bundle path."},
+                                       {NotAZipFile,              "The uploaded file is not a zip file."},
                                        {CannotFindExchangeType,   "Can not find exchange type."},
                                        {ExchangeTypeInvalid,      "The current exchange type is invalid."},
                                        {ExchangeTypeNotSimulator, "The current exchange type is not simulator."},

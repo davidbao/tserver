@@ -177,7 +177,6 @@ bool ExcSimFile::removeLabel(const StringMap &request, StringMap &response) {
         }
         if (element.enable && names.contains(element.name)) {
             element.removeYmlProperties(_properties, i);
-            break;
         }
     }
 
@@ -329,7 +328,6 @@ bool ExcSimFile::removeTable(const StringMap &request, StringMap &response) {
         }
         if (element.enable && names.contains(element.name)) {
             element.removeYmlProperties(_properties, i);
-            break;
         }
     }
 
@@ -369,9 +367,9 @@ bool ExcSimDatabase::load() {
     auto *cs = factory->getService<IConfigService>();
     assert(cs);
 
-    String userName = cs->getProperty(DatabasePrefix "username");
-    String password = cs->getProperty(DatabasePrefix "password");
-    String urlStr = cs->getProperty(DatabasePrefix "url");
+    String userName = cs->getProperty(SimDbPrefix "username");
+    String password = cs->getProperty(SimDbPrefix "password");
+    String urlStr = cs->getProperty(SimDbPrefix "url");
     _dbClient = DataSourceService::open(urlStr, userName, password);
     return _dbClient != nullptr;
 }
@@ -641,7 +639,7 @@ String ExcSimDatabase::getTablePrefix() {
     assert(cs);
 
     String prefix;
-    cs->getProperty(DatabasePrefix "table.prefix", prefix);
+    cs->getProperty(SimDbPrefix "table.prefix", prefix);
     return prefix;
 }
 
