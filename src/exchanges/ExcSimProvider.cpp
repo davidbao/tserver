@@ -9,6 +9,7 @@
 #include "system/ServiceFactory.h"
 #include "system/Math.h"
 #include "IO/Path.h"
+#include "diag/Trace.h"
 #include "ExcSimProvider.h"
 #include "../HttpErrorCode.h"
 #include "ExcSimStorage.h"
@@ -17,6 +18,7 @@
 using namespace Config;
 using namespace IO;
 using namespace System;
+using namespace Diag;
 
 ExcSimProvider::ExcSimProvider() : _storage(nullptr) {
     ServiceFactory *factory = ServiceFactory::instance();
@@ -54,9 +56,14 @@ FetchResult ExcSimProvider::getLabelValues(const String &labelName, const String
                 }
             }
             return FetchResult::Succeed;
+        } else {
+            Trace::error(String::format("Can not find a label, table name: %s", labelName.c_str()));
+            return FetchResult::LabelNotFound;
         }
     }
-    return FetchResult::RowCountError;
+
+    Trace::error("Can not find simulator config!");
+    return FetchResult::ConfigError;
 }
 
 FetchResult ExcSimProvider::getTableValues(const String &tableName, const StringArray &colNames,
@@ -67,6 +74,7 @@ FetchResult ExcSimProvider::getTableValues(const String &tableName, const String
             Columns columns;
             table.getColumns(colNames, columns);
             if (columns.count() == 0) {
+                Trace::error(String::format("Can not find table columns, table name: %s", tableName.c_str()));
                 return FetchResult::ColumnError;
             }
 
@@ -84,12 +92,18 @@ FetchResult ExcSimProvider::getTableValues(const String &tableName, const String
                       table.rowCount :
                       (next < table.rowCount ? next : table.rowCount);
             for (int row = start; row < end; ++row) {
+                bool validRow = true;
                 DataRow dataRow;
                 for (size_t j = 0; j < columns.count(); ++j) {
                     const Column &col = columns[j];
-                    dataRow.addCell(DataCell(dataTable.columns()[col.name], col.getCellValue(&table, filter, row)));
+                    Variant value = col.getCellValue(&table, filter, row);
+                    if (value.isNullValue())
+                        validRow = false;
+                    dataRow.addCell(DataCell(dataTable.columns()[col.name], value));
                 }
-                dataTable.addRow(dataRow);
+                if (validRow) {
+                    dataTable.addRow(dataRow);
+                }
             }
 
             // initial the total count of table.
@@ -99,9 +113,14 @@ FetchResult ExcSimProvider::getTableValues(const String &tableName, const String
             dataTable.sort(filter.orderBy());
 
             return FetchResult::Succeed;
+        } else {
+            Trace::error(String::format("Can not find a table, table name: %s", tableName.c_str()));
+            return FetchResult ::TableNotFound;
         }
     }
-    return FetchResult::RowCountError;
+
+    Trace::error("Can not find simulator config!");
+    return FetchResult::ConfigError;
 }
 
 bool ExcSimProvider::loadData() {

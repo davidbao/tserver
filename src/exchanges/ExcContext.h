@@ -27,7 +27,9 @@ enum FetchResult {
     RowCountError = 3,
     ColumnError = 4,
     NodeNotFound = 5,
-    DbError = 6
+    DbError = 6,
+    LabelNotFound = 7,
+    TableNotFound = 8
 };
 
 class IExcProvider {

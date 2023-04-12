@@ -677,15 +677,29 @@ Variant Column::getCellValue(const Table *table, const SqlSelectFilter &filter, 
             if (ranges.count() == 2) {
                 DateTime::parse(ranges[0], tMinValue);
                 DateTime::parse(ranges[1], tMaxValue);
+                DateTime now = DateTime::now();
+                static const DateTime AD1 = DateTime(1, 1, 1);
+                if (tMinValue.date() == AD1) {
+                    tMinValue = now.date() + tMinValue.timeOfDay();
+                }
+                if (tMaxValue.date() == AD1) {
+                    tMaxValue = now.date() + tMaxValue.timeOfDay();
+                }
+//                printf("min time: %s, max time: %s\n", tMinValue.toString().c_str(), tMaxValue.toString().c_str());
             }
         }
         TimeSpan tStep;
         TimeSpan::parse(String::trim(style["step"], '\'', '"', ' '), tStep);
-//        printf("v: %s, step: %s\n", v.c_str(), tStep.toString().c_str());
         String formatStr = String::trim(style["format"], '\'', '"', ' ');
         if (!(tMinValue == DateTime::MinValue && tMaxValue == DateTime::MaxValue &&
               tStep == TimeSpan::Zero && !formatStr.isNullOrEmpty())) {
+            bool upToNow = false;
+            Boolean::parse(style["upToNow"], upToNow);
+            if (upToNow) {
+                tMaxValue = DateTime::now();
+            }
             DateTime v = tMinValue.addTicks(tStep.ticks() * row);
+//            printf("name: %s, v: %s, step: %s\n", name.c_str(), v.toString().c_str(), tStep.toString().c_str());
             if (v <= tMaxValue) {
                 result = Variant(Variant::Text, v.toString(formatStr));
             }
