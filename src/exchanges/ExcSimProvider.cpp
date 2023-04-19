@@ -49,15 +49,20 @@ FetchResult ExcSimProvider::getLabelValues(const String &labelName, const String
     if (_storage != nullptr) {
         Label label;
         if (_storage->getLabel(labelName, label)) {
-            for (size_t j = 0; j < label.tags.count(); j++) {
-                const Tag &tag = label.tags[j];
-                if (tagNames.isEmpty() || tagNames.contains(tag.name)) {
-                    values.add(tag.name, tag.getValue(&label, filter));
-                }
+            Tags tags;
+            label.getTags(tagNames, tags);
+            if (tags.count() == 0) {
+                Trace::error(String::format("Can not find label tags, label name: %s", labelName.c_str()));
+                return FetchResult::TagError;
+            }
+
+            for (size_t i = 0; i < tags.count(); i++) {
+                const Tag &tag = tags[i];
+                values.add(tag.name, tag.getValue(&label, filter));
             }
             return FetchResult::Succeed;
         } else {
-            Trace::error(String::format("Can not find a label, table name: %s", labelName.c_str()));
+            Trace::error(String::format("Can not find a label, name: %s", labelName.c_str()));
             return FetchResult::LabelNotFound;
         }
     }
@@ -114,7 +119,7 @@ FetchResult ExcSimProvider::getTableValues(const String &tableName, const String
 
             return FetchResult::Succeed;
         } else {
-            Trace::error(String::format("Can not find a table, table name: %s", tableName.c_str()));
+            Trace::error(String::format("Can not find a table, name: %s", tableName.c_str()));
             return FetchResult ::TableNotFound;
         }
     }

@@ -14,6 +14,7 @@
 #include "database/DataTable.h"
 #include "database/SqlSelectFilter.h"
 #include "../Style.h"
+#include "ExcContext.h"
 #include <cassert>
 
 using namespace Data;
@@ -21,7 +22,7 @@ using namespace Database;
 using namespace System;
 
 // for application.yml
-#define SimulatorPrefix "summer.exchange.simulator."
+#define SimulatorPrefix ExcPrefix "simulator."
 #define SimDbPrefix SimulatorPrefix "database."
 
 // for yml file.
@@ -126,7 +127,16 @@ public:
     DbType type() const;
 };
 
-typedef List<Tag> Tags;
+class Tags : public List<Tag> {
+public:
+    Tags();
+
+    ~Tags() override;
+
+    bool contains(const StringArray &names) const;
+
+    bool atByName(const String &name, Tag &tag) const;
+};
 
 class Label : public Element, public IEvaluation<Label>, public IEquatable<Label> {
 public:
@@ -159,6 +169,8 @@ public:
     String toInsertSqlStr(const String &prefix) const;
 
     String toReplaceSqlStr(const String &prefix) const;
+
+    bool getTags(const StringArray &tagNames, Tags &tags) const;
 
 public:
     static bool parse(const StringMap &request, Label &label);

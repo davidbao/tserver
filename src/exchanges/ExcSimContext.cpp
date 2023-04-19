@@ -287,6 +287,39 @@ DbType Tag::type() const {
     }
 }
 
+Tags::Tags() = default;
+
+Tags::~Tags() = default;
+
+bool Tags::contains(const StringArray &names) const {
+    for (int i = 0; i < names.count(); ++i) {
+        const String &name = names[i];
+        bool found = false;
+        for (int j = 0; j < count(); ++j) {
+            const Tag &tag = at(j);
+            if (String::equals(tag.name, name, true)) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool Tags::atByName(const String &name, Tag &tag) const {
+    for (int i = 0; i < count(); ++i) {
+        const Tag &t = at(i);
+        if (String::equals(t.name, name, true)) {
+            tag = t;
+            return true;
+        }
+    }
+    return false;
+}
+
 Label::Label(const String &name, double minValue, double maxValue, double step) :
         Element(name, minValue, maxValue, step) {
 }
@@ -588,6 +621,21 @@ String Label::toDeleteSqlStr(const String &prefix, const String &labelName) {
     return sql;
 }
 
+bool Label::getTags(const StringArray &tagNames, Tags &tags) const {
+    if (tagNames.isEmpty()) {
+        tags.addRange(this->tags);
+    } else {
+        for (size_t i = 0; i < tagNames.count(); ++i) {
+            const String &tagName = tagNames[i];
+            Tag tag;
+            if (this->tags.atByName(tagName, tag)) {
+                tags.add(tag);
+            }
+        }
+    }
+    return tags.count() > 0;
+}
+
 Column::Column(const String &name, const String &registerStr, const Style &style) :
         Item(name, registerStr, style) {
 }
@@ -773,7 +821,7 @@ bool Columns::contains(const StringArray &names) const {
         bool found = false;
         for (int j = 0; j < count(); ++j) {
             const Column &column = at(j);
-            if (column.name == name) {
+            if (String::equals(column.name, name, true)) {
                 found = true;
                 break;
             }
@@ -788,7 +836,7 @@ bool Columns::contains(const StringArray &names) const {
 bool Columns::atByName(const String &name, Column &column) const {
     for (int i = 0; i < count(); ++i) {
         const Column &col = at(i);
-        if (col.name == name) {
+        if (String::equals(col.name, name, true)) {
             column = col;
             return true;
         }

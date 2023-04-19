@@ -42,7 +42,7 @@ private:
     static String getTablePrefix();
 
 private:
-#define DatabasePrefix "summer.exchange.database."
+#define DatabasePrefix ExcPrefix "database."
 
 #define MaxLabelCount 1000
 #define DbLabelPrefix DatabasePrefix "labels[%d]."

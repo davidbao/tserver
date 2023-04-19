@@ -35,7 +35,7 @@ DbClient *ExcDbProvider::dbClient() const {
 void ExcDbProvider::createSqlFile(const String &fileName, const String &sql) {
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
-    auto *ds = factory->getService<IDataSourceService>();
+    auto ds = factory->getService<IDataSourceService>();
     assert(ds);
     return ds->createSqlFile(fileName, sql);
 }
@@ -70,10 +70,14 @@ FetchResult ExcDbProvider::getLabelValues(const String &labelName, const StringA
         const DataCells &cells = row.cells();
         for (size_t i = 0; i < cells.count(); i++) {
             const DataCell &cell = cells.at(i);
-            for (size_t j = 0; j < tagNames.count(); j++) {
-                const String &key = tagNames[j];
-                if (cell.matchColumnName(key)) {
-                    values.add(cell.columnName(), cell.value());
+            if (tagNames.isEmpty()) {
+                values.add(cell.columnName(), cell.value());
+            } else {
+                for (size_t j = 0; j < tagNames.count(); j++) {
+                    const String &tagName = tagNames[j];
+                    if (cell.matchColumnName(tagName)) {
+                        values.add(cell.columnName(), cell.value());
+                    }
                 }
             }
         }

@@ -25,12 +25,15 @@ enum FetchResult {
     ConfigError = 1,
     ExecFailed = 2,
     RowCountError = 3,
-    ColumnError = 4,
-    NodeNotFound = 5,
-    DbError = 6,
-    LabelNotFound = 7,
-    TableNotFound = 8
+    TagError = 4,
+    ColumnError = 5,
+    NodeNotFound = 6,
+    DbError = 7,
+    LabelNotFound = 8,
+    TableNotFound = 9
 };
+
+#define ExcPrefix "summer.exchange."
 
 class IExcProvider {
 public:

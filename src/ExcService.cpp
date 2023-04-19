@@ -11,8 +11,10 @@
 #include "exchanges/ExcSimProvider.h"
 #include "exchanges/ExcDbProvider.h"
 #include "HttpErrorCode.h"
+#include "diag/Trace.h"
 
 using namespace Config;
+using namespace Diag;
 
 ExcService::ExcService() : _provider(nullptr) {
     ServiceFactory *factory = ServiceFactory::instance();
@@ -55,7 +57,7 @@ String ExcService::type() const {
     assert(cs);
 
     String type;
-    cs->getProperty("summer.exchange.type", type);
+    cs->getProperty(ExcPrefix "type", type);
     return isTypeValid(type) ? type : String::Empty;
 }
 
@@ -87,6 +89,14 @@ FetchResult ExcService::getLabelValues(const JsonNode &request, JsonNode &respon
         return FetchResult::ConfigError;
     }
 
+    ServiceFactory *factory = ServiceFactory::instance();
+    assert(factory);
+    auto *cs = factory->getService<IConfigService>();
+    assert(cs);
+
+    String responseStyle;
+    cs->getProperty(ExcPrefix "response.style", responseStyle);
+
     if (request.name() == "label") {
         List<JsonNode> nodes;
         request.subNodes(nodes);
@@ -105,7 +115,16 @@ FetchResult ExcService::getLabelValues(const JsonNode &request, JsonNode &respon
                 iNode.add(JsonNode("name", name));
                 iNode.add(JsonNode("errorCode", (int) result));
                 if (result == FetchResult::Succeed) {
-                    JsonNode tagsNode("tags", values);
+                    JsonNode tagsNode("tags");
+                    for (auto it = values.begin(); it != values.end(); ++it) {
+                        auto tagName = it.key();
+                        auto tagValue = it.value();
+                        if (responseStyle == "string") {
+                            tagsNode.add(JsonNode(tagName, tagValue.toString()));
+                        } else {
+                            tagsNode.add(JsonNode(tagName, tagValue));
+                        }
+                    }
                     iNode.add(tagsNode);
                 }
                 lNode.add(iNode);
@@ -126,6 +145,14 @@ FetchResult ExcService::getTableValues(const JsonNode &request, JsonNode &respon
     if (provider == nullptr) {
         return FetchResult::ConfigError;
     }
+
+    ServiceFactory *factory = ServiceFactory::instance();
+    assert(factory);
+    auto *cs = factory->getService<IConfigService>();
+    assert(cs);
+
+    String responseStyle;
+    cs->getProperty(ExcPrefix "response.style", responseStyle);
 
     if (request.name() == "table") {
         List<JsonNode> nodes;
@@ -153,8 +180,14 @@ FetchResult ExcService::getTableValues(const JsonNode &request, JsonNode &respon
                         iNode.add(JsonNode("pageCount", pageCount));
                         iNode.add(JsonNode("totalCount", table.totalCount()));
 
+//                        if (ignoreCase) {
+//                            for (size_t j = 0; j < table.columnCount(); ++j) {
+//                                auto column = table.columns()[j];
+//                                if (String::equals(column.name(), tags))
+//                            }
+//                        }
                         JsonNode dataNode;
-                        table.toJsonNode(dataNode, "g");
+                        table.toJsonNode(dataNode, responseStyle == "string" ? "cs" : "cn");
                         iNode.add(dataNode);
                     }
                     tNode.add(iNode);
@@ -194,7 +227,7 @@ bool ExcService::setType(const StringMap &request, StringMap &response) {
         assert(cs);
 
         YmlNode::Properties properties;
-        properties.add("summer.exchange.type", type);
+        properties.add(ExcPrefix "type", type);
         if (!cs->updateConfigFile(properties)) {
             // Failed to save config file.
             response.addRange(HttpCode::at(FailedToSave));
