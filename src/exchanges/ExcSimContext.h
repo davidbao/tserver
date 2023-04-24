@@ -170,7 +170,7 @@ public:
 
     String toReplaceSqlStr(const String &prefix) const;
 
-    bool getTags(const StringArray &tagNames, Tags &tags) const;
+    bool getTags(const StringArray &tagNames, Tags &values) const;
 
 public:
     static bool parse(const StringMap &request, Label &label);

@@ -7,6 +7,7 @@
 //
 
 #include "configuration/ConfigService.h"
+#include "diag/Trace.h"
 #include "IO/Path.h"
 #include "IO/File.h"
 #include "IO/Directory.h"
@@ -22,6 +23,7 @@
 using namespace IO;
 using namespace Config;
 using namespace Crypto;
+using namespace Diag;
 
 TaskService::TaskService() : _storage(nullptr), _cache(nullptr) {
     ServiceFactory *factory = ServiceFactory::instance();
@@ -67,13 +69,13 @@ bool TaskService::loadData() {
     String type;
     cs->getProperty(TaskPrefix "type", type);
     if (String::equals(type, "file", true)) {
+        Trace::info("Load task from file.");
         _storage = new TaskFile();
-        return _storage->load();
     } else if (String::equals(type, "database", true)) {
+        Trace::info("Load task from database.");
         _storage = new TaskDatabase();
-        return _storage->load();
     }
-    return false;
+    return _storage != nullptr && _storage->load();
 }
 
 bool TaskService::getTasks(const SqlSelectFilter &filter, DataTable &table) {

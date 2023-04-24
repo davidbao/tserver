@@ -621,19 +621,19 @@ String Label::toDeleteSqlStr(const String &prefix, const String &labelName) {
     return sql;
 }
 
-bool Label::getTags(const StringArray &tagNames, Tags &tags) const {
+bool Label::getTags(const StringArray &tagNames, Tags &values) const {
     if (tagNames.isEmpty()) {
-        tags.addRange(this->tags);
+        values.addRange(tags);
     } else {
         for (size_t i = 0; i < tagNames.count(); ++i) {
             const String &tagName = tagNames[i];
             Tag tag;
-            if (this->tags.atByName(tagName, tag)) {
-                tags.add(tag);
+            if (tags.atByName(tagName, tag)) {
+                values.add(tag);
             }
         }
     }
-    return tags.count() > 0;
+    return values.count() > 0;
 }
 
 Column::Column(const String &name, const String &registerStr, const Style &style) :

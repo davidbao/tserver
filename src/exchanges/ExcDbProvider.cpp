@@ -19,7 +19,9 @@
 using namespace Config;
 using namespace Microservice;
 
-ExcDbProvider::ExcDbProvider() = default;
+ExcDbProvider::ExcDbProvider() {
+    Trace::info("The exchange type is database.");
+}
 
 ExcDbProvider::~ExcDbProvider() = default;
 
@@ -63,25 +65,36 @@ FetchResult ExcDbProvider::getLabelValues(const String &labelName, const StringA
     if (dbClient->executeSqlQuery(sql, table)) {
         const DataRows &rows = table.rows();
         if (rows.count() != 1) {
-            return FetchResult::RowCountError;
-        }
-
-        const DataRow &row = rows.at(0);
-        const DataCells &cells = row.cells();
-        for (size_t i = 0; i < cells.count(); i++) {
-            const DataCell &cell = cells.at(i);
-            if (tagNames.isEmpty()) {
-                values.add(cell.columnName(), cell.value());
-            } else {
-                for (size_t j = 0; j < tagNames.count(); j++) {
-                    const String &tagName = tagNames[j];
-                    if (cell.matchColumnName(tagName)) {
-                        values.add(cell.columnName(), cell.value());
+            StringArray columnsNames = dbClient->getColumnName(labelName);
+            for (size_t i = 0; i < columnsNames.count(); i++) {
+                const String &columnName = columnsNames.at(i);
+                if (tagNames.isEmpty()) {
+                    values.add(columnName, Variant::NullValue);
+                } else {
+                    if (tagNames.contains(columnName, true)) {
+                        values.add(columnName, Variant::NullValue);
                     }
                 }
             }
+            return FetchResult::Succeed;
+        } else {
+            const DataRow &row = rows.at(0);
+            const DataCells &cells = row.cells();
+            for (size_t i = 0; i < cells.count(); i++) {
+                const DataCell &cell = cells.at(i);
+                if (tagNames.isEmpty()) {
+                    values.add(cell.columnName(), cell.value());
+                } else {
+                    for (size_t j = 0; j < tagNames.count(); j++) {
+                        const String &tagName = tagNames[j];
+                        if (cell.matchColumnName(tagName)) {
+                            values.add(cell.columnName(), cell.value());
+                        }
+                    }
+                }
+            }
+            return FetchResult::Succeed;
         }
-        return FetchResult::Succeed;
     }
     return FetchResult::ExecFailed;
 }

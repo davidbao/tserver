@@ -21,6 +21,8 @@ using namespace System;
 using namespace Diag;
 
 ExcSimProvider::ExcSimProvider() : _storage(nullptr) {
+    Trace::info("The exchange type is simulator.");
+
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
     auto *cs = factory->getService<IConfigService>();
@@ -137,13 +139,13 @@ bool ExcSimProvider::loadData() {
     String type;
     cs->getProperty(SimulatorPrefix "type", type);
     if (String::equals(type, "file", true)) {
+        Trace::info("Load simulator from file.");
         _storage = new ExcSimFile();
-        return _storage->load();
     } else if (String::equals(type, "database", true)) {
+        Trace::info("Load simulator from database.");
         _storage = new ExcSimDatabase();
-        return _storage->load();
     }
-    return false;
+    return _storage != nullptr && _storage->load();
 }
 
 bool ExcSimProvider::getLabels(const SqlSelectFilter &filter, DataTable &table) {
