@@ -446,7 +446,8 @@ bool AdminService::uploadWebBundle(const StringMap &request, StringMap &response
     // check md5.
     if (!md5.isNullOrEmpty()) {
         String actual;
-        if (Md5Provider::computeFileHash(fullFileName, actual)) {
+        Md5Provider md5p;
+        if (md5p.computeFileHash(fullFileName, actual)) {
             if (!String::equals(actual, md5, true)) {
                 response.addRange(HttpCode::at(FailedToVerifyMd5));
                 return false;

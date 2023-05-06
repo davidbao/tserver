@@ -55,7 +55,8 @@ bool Execution::checkFile(const String &md5) const {
     String fileName = currentFile();
     if (File::exists(fileName)) {
         String actual;
-        if (Md5Provider::computeFileHash(fileName, actual)) {
+        Md5Provider md5p;
+        if (md5p.computeFileHash(fileName, actual)) {
             return String::equals(actual, md5, true);
         }
     }
