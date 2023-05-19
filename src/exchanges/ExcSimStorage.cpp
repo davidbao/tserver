@@ -29,7 +29,14 @@ bool ExcSimFile::load() {
     String name = cs->getProperty(SimulatorPrefix "file.name");
     String fileName = Path::combine(path, String::format("%s.yml", name.c_str()));
     Locker locker(&_properties);
-    return YmlNode::loadFile(fileName, _properties);
+    auto result = YmlNode::loadFile(fileName, _properties);
+//    const YmlNode::Properties &props = _properties;
+//    for (auto it = props.begin(); it != props.end(); ++it) {
+//        const String &key = it.key();
+//        const String &value = it.value();
+//        Trace::info(String::format("%s=%s", key.c_str(), value.c_str()));
+//    }
+    return result;
 }
 
 bool ExcSimFile::getLabel(const String &name, Label &label) {

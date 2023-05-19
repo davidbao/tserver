@@ -48,8 +48,7 @@ bool Style::isEmpty() const {
 String Style::toString() const {
     if (_values.count() == 0) {
         return String::Empty;
-    }
-    else if (_values.count() == 1) {
+    } else if (_values.count() == 1) {
         return _values[String::Empty];
     } else {
         JsonNode node("style", _values);
@@ -99,12 +98,35 @@ bool Style::parse(const String &str, Style &style) {
             style._values.add(String::Empty, str);
         }
     } else {
+        auto isInQuoteStr = [](const String &text, ssize_t pos) {
+            if (pos <= 0) {
+                return false;
+            }
+            ssize_t forward = pos;
+            while (forward >= 0) {
+                if (text[forward] == '\'' || text[forward] == '\"') {
+                    break;
+                }
+                forward--;
+            }
+            ssize_t backward = pos;
+            while (backward < text.length()) {
+                if (text[backward] == '\'' || text[backward] == '\"') {
+                    break;
+                }
+                backward++;
+            }
+            return (forward >= 0 && forward < text.length() - 1) &&
+                   (backward >= 0 && backward < text.length() - 1) &&
+                   (pos > forward && pos < backward);
+        };
+
         StringArray texts;
         StringArray::parse(str, texts, ';');
         for (size_t i = 0; i < texts.count(); ++i) {
             const String &text = texts[i];
             ssize_t pos = text.find(':');
-            if (pos > 0) {
+            if (pos > 0 && !isInQuoteStr(text, pos)) {
                 String key = text.substr(0, pos).trim('\'', '"', ' ');
                 pos++;  // skip :
                 String value = text.substr(pos, text.length() - pos).trim('\'', '"', ' ');

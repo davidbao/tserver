@@ -721,7 +721,7 @@ Variant Column::getCellValue(const Table *table, const SqlSelectFilter &filter, 
             DateTime::parse(filter.getToValue(name), tMaxValue);
         } else {
             StringArray ranges;
-            StringArray::parse(rangeStr, ranges, '-');
+            StringArray::parse(rangeStr, ranges, '~');
             if (ranges.count() == 2) {
                 DateTime::parse(ranges[0], tMinValue);
                 DateTime::parse(ranges[1], tMaxValue);
