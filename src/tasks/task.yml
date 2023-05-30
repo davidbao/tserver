@@ -1,0 +1,57 @@
+tasks:
+  - name: sql_sql
+    schedule:
+      type: cycle
+      interval: 00:00:10
+    execution:
+      type: sql
+      file: sql/n1.inserts.sql
+
+  - name: app_test
+    schedule:
+      type: timing
+      time: 00:00:00
+      repeat:
+        type: minute
+    execution:
+      type: app
+      app: t1
+      param: -l
+
+  - name: sql_sql
+    schedule:
+      type: cycle
+      interval: 00:00:50
+    execution:
+      type: sql
+      sql: select count(1) from n1
+
+  - name: sql_file
+    schedule:
+      type: cycle
+      interval: 00:00:50
+    execution:
+      type: sql
+      file: sql/t1.sql
+
+  - name: python_script
+    schedule:
+      type: cycle
+      interval: 00:00:20
+    execution:
+      type: python
+      script: 'print("Hello, World!");
+       print("Hello, World2!")'
+
+  - name: python_file
+    schedule:
+      type: cycle
+      interval: 00:00:10
+    execution:
+      type: python
+      file: python/t1.py
+      param: abc
+
+
+
+

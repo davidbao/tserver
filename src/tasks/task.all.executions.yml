@@ -1,0 +1,52 @@
+tasks:
+  - name: test
+    schedule:
+      type: timing
+      time: 00:00:06
+      repeat:
+        type: minute
+    execution:
+      type: app
+      app: app/t1
+      param: -l
+  - name: test2
+    schedule:
+      type: timing
+      time: 00:00:07
+      repeat:
+        type: minute
+    execution:
+      type: python
+      file: python/test.py
+      param: 
+  - name: test3
+    schedule:
+      type: timing
+      time: 00:00:08
+      repeat:
+        type: minute
+    execution:
+      type: python
+      script: print("test")
+  - name: test4
+    schedule:
+      type: timing
+      time: 00:00:09
+      repeat:
+        type: minute
+    execution:
+      type: sql
+      file: sql/t1.sql
+  - name: test5
+    schedule:
+      type: timing
+      time: 00:00:010
+      repeat:
+        type: minute
+    execution:
+      type: sql
+      sql: select COUNT(1) from home_total
+  
+
+
+

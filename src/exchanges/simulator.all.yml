@@ -1,0 +1,88 @@
+labels:
+  - name: test1
+    range: 0-100
+    step: 1
+    tags:
+      - name: t01.increase
+        register: increase
+      - name: t02.decrease
+        register: decrease
+      - name: t03.random
+        register: random
+      - name: t04.sin
+        register: sin
+      - name: t05.cos
+        register: cos
+      - name: t06.onoff
+        register: onoff
+      - name: t07.array
+        register: array
+        style: 1, 2, 3, 4, 5, 6, 中文, abc
+      - name: t08.incoming
+        register: incoming
+      - name: t09.abc
+        register: abc
+      - name: t10.13
+        register: 13
+      - name: t11.increase
+        register: increase
+        style: "range: '100-200'; step: '2'"
+  - name: test2
+    range: 0-100
+    step: 2
+    interval: 00:00:01
+    tags:
+      - name: t01
+        register: random
+      - name: t02
+        register: increase
+      - name: t03
+        register: 17
+      - name: t04
+        register: 18
+      - name: t05
+        register: 19
+      - name: t06
+        register: 20
+tables:
+  - name: test1
+    range: 0-100
+    step: 1
+    rowCount: 24
+    columns:
+      - name: time
+        register: time
+        style: "range: '00:00:00-23:00:00'; step: '01:00:00'; format: 'HH:mm'"
+      - name: c01.increase
+        register: increase
+      - name: c02.decrease
+        register: decrease
+      - name: c03.random
+        register: random
+      - name: c04.sin
+        register: sin
+      - name: c05.cos
+        register: cos
+      - name: c06.onoff
+        register: onoff
+      - name: c07.array
+        register: array
+        style: 1, 2, 3, 4, 5, 6, 中文, abc
+      - name: c08.incoming
+        register: incoming
+      - name: c09.abc
+        register: abc
+      - name: c10.13
+        register: 13
+      - name: c11.increase
+        register: increase
+        style: "range: '100-200'; step: '2'"
+  - name: test2
+    range: 0-100
+    step: 1
+    rowCount: 8
+    columns:
+      - name: item
+        register: array
+        style: 1, 2, 3, 4, 5, 6, 中文, abc
+  
