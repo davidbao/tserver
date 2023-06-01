@@ -110,14 +110,14 @@ bool Style::parse(const String &str, Style &style) {
                 forward--;
             }
             ssize_t backward = pos;
-            while (backward < text.length()) {
+            while (backward < (ssize_t)text.length()) {
                 if (text[backward] == '\'' || text[backward] == '\"') {
                     break;
                 }
                 backward++;
             }
-            return (forward >= 0 && forward < text.length() - 1) &&
-                   (backward >= 0 && backward < text.length() - 1) &&
+            return (forward >= 0 && forward < (ssize_t)text.length() - 1) &&
+                   (backward >= 0 && backward < (ssize_t)text.length() - 1) &&
                    (pos > forward && pos < backward);
         };
 
