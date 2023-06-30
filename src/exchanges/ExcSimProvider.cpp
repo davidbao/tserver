@@ -93,17 +93,17 @@ FetchResult ExcSimProvider::getTableValues(const String &tableName, const String
             }
 
             // add rows.
-            int start = table.rowCount < filter.pageSize() ? 0 : filter.offset();
+            int start = table.rowCount() < filter.pageSize() ? 0 : filter.offset();
             int next = start + filter.pageSize();
-            int end = table.rowCount < filter.pageSize() ?
-                      table.rowCount :
-                      (next < table.rowCount ? next : table.rowCount);
-            for (int row = start; row < end; ++row) {
+            int end = table.rowCount() < filter.pageSize() ?
+                      table.rowCount() :
+                      (next < table.rowCount() ? next : table.rowCount());
+            for (int i = start; i < end; ++i) {
                 bool validRow = true;
                 DataRow dataRow;
-                for (size_t j = 0; j < columns.count(); ++j) {
+                for (int j = 0; j < (int) columns.count(); ++j) {
                     const Column &col = columns[j];
-                    Variant value = col.getCellValue(&table, filter, row);
+                    Variant value = col.getCellValue(&table, filter, i, j);
                     if (value.isNullValue())
                         validRow = false;
                     dataRow.addCell(DataCell(dataTable.columns()[col.name], value));
@@ -114,10 +114,36 @@ FetchResult ExcSimProvider::getTableValues(const String &tableName, const String
             }
 
             // initial the total count of table.
-            dataTable.setTotalCount(Math::min(table.rowCount, (int) dataTable.rowCount()));
+            dataTable.setTotalCount(Math::min(table.rowCount(), (int) dataTable.rowCount()));
 
             // sort
+//#ifdef DEBUG
+//            printf("Before sort!\n");
+//            for (int i = 0; i < dataTable.rowCount(); ++i) {
+//                auto row = dataTable.rows()[i];
+//                printf("%d: ", i);
+//                for (int j = 0; j < row.cellCount(); ++j) {
+//                    auto cell = row.cells()[j];
+//                    printf("%s", cell.valueStr().c_str());
+//                    printf("%s", ",");
+//                }
+//                printf("%s", "\n");
+//            }
+//#endif
             dataTable.sort(filter.orderBy());
+//#ifdef DEBUG
+//            printf("%s", "After sort!\n");
+//            for (int i = 0; i < dataTable.rowCount(); ++i) {
+//                auto row = dataTable.rows()[i];
+//                printf("%d: ", i);
+//                for (int j = 0; j < row.cellCount(); ++j) {
+//                    auto cell = row.cells()[j];
+//                    printf("%s", cell.valueStr().c_str());
+//                    printf("%s", ",");
+//                }
+//                printf("%s", "\n");
+//            }
+//#endif
 
             return FetchResult::Succeed;
         } else {

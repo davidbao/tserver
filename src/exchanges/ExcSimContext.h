@@ -35,6 +35,8 @@ using namespace System;
 #define TablePrefix "tables[%d]."
 #define MaxColumnCount 100
 #define ColumnPrefix TablePrefix "columns[%d]."
+#define MaxRowCount 1000
+#define RowPrefix TablePrefix "rows[%d]."
 
 // for database.
 #define LabelTableName "sim_label"
@@ -60,8 +62,6 @@ public:
     void evaluates(const Item &other);
 
     bool equals(const Item &other) const;
-
-//    virtual bool getValue(const Element *element, const SqlSelectFilter &filter, String &valueStr) = 0;
 
 protected:
     static bool parseRange(const Style &style, double &minValue, double &maxValue, double &step);
@@ -207,7 +207,7 @@ public:
 
     Column(const Column &Column);
 
-    Variant getCellValue(const Table *table, const SqlSelectFilter &filter, int row) const;
+    Variant getCellValue(const Table *table, const SqlSelectFilter &filter, int row, int col) const;
 
     bool equals(const Column &other) const override;
 
@@ -227,12 +227,36 @@ public:
     bool atByName(const String &name, Column &column) const;
 };
 
+class Row : public IEvaluation<Row>, public IEquatable<Row> {
+public:
+    Row() = default;
+
+    Row(const String &rowStr);
+
+    Row(const StringArray &cells);
+
+    Row(const Row &row);
+
+    bool equals(const Row &other) const override;
+
+    void evaluates(const Row &other) override;
+
+    const StringArray &cells() const;
+
+    String toString() const;
+
+private:
+    StringArray _cells;
+};
+
+typedef List<Row> Rows;
+
 class Table : public Element, public IEvaluation<Table>, public IEquatable<Table> {
 public:
     using Element::findItemName;
 
-    int rowCount;
     Columns columns;
+    Rows rows;
 
     Table();
 
@@ -249,6 +273,12 @@ public:
     bool findItemName(const StringArray &itemNames) const override;
 
     JsonNode toJsonNode() const override;
+
+    int rowCount() const;
+
+    String toColumnsStr() const;
+
+    String toRowsStr() const;
 
     bool getColumns(const StringArray &colNames, Columns &cols) const;
 
@@ -278,7 +308,12 @@ public:
 private:
     static bool parseColumns(const String &str, Columns &columns);
 
+    static bool parseRows(const String &str, Rows &rows);
+
     static String getTableName(const String &prefix, const String &tableName);
+
+private:
+    int _rowCount;
 };
 
 typedef List<Table> Tables;

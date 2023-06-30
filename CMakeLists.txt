@@ -15,12 +15,12 @@ cmake_minimum_required(VERSION 3.2.3)
 project(tserver)
 
 option(TSERVER_STATIC_STDLIB "Option for build with static libstdc++" OFF)
-option(TSERVER_ENABLE_TEST "Option for build with test" OFF)
+option(TSERVER_ENABLE_TEST "Option for build with test" ON)
 option(TSERVER_BUILD_KINGBASE "Option for build with Kingbase" OFF)
 
 ## build settings
 set(TSERVER_VERSION_MAJOR 1)
-set(TSERVER_VERSION_MINOR 0)
+set(TSERVER_VERSION_MINOR 2)
 set(TSERVER_VERSION_PATCH 0)
 set(TSERVER_VERSION ${TSERVER_VERSION_MAJOR}.${TSERVER_VERSION_MINOR}.${TSERVER_VERSION_PATCH})
 

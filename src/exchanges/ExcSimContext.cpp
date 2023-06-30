@@ -652,139 +652,186 @@ void Column::evaluates(const Column &other) {
     Item::evaluates(other);
 }
 
-Variant Column::getCellValue(const Table *table, const SqlSelectFilter &filter, int row) const {
-    double minValue, maxValue, step;
-    if (!parseRange(style, minValue, maxValue, step)) {
-        minValue = table->minValue;
-        maxValue = table->maxValue;
-        step = table->step;
-    }
-
-    Variant result;
-    if (String::equals(registerStr, "increase", true)) {
-        int maxValueRowCount = (int) Math::round((maxValue - minValue) / step + 0.5);
-        double v = minValue;
-        v += step * (row % maxValueRowCount);
-        result = Variant(Variant::Float64, v);
-    } else if (String::equals(registerStr, "decrease", true)) {
-        int maxValueRowCount = (int) Math::round((maxValue - minValue) / step + 0.5);
-        double v = maxValue;
-        v -= step * (row % maxValueRowCount);
-        result = Variant(Variant::Float64, v);
-    } else if (String::equals(registerStr, "random", true)) {
-        double v = Random::getRandValue(minValue, maxValue);
-        result = Variant(Variant::Float64, v);
-    } else if (String::equals(registerStr, "sin", true)) {
-        double v = minValue;
-        v += step * row;
-        double scope = maxValue - minValue + step;
-        v = minValue + scope * (Math::sin(v) + 1.0) / 2.0;
-        if (v < minValue)
-            v = minValue;
-        if (v > maxValue)
-            v = maxValue;
-        result = Variant(Variant::Float64, v);
-    } else if (String::equals(registerStr, "cos", true)) {
-        double v = minValue;
-        v += step * row;
-        double scope = maxValue - minValue + step;
-        v = minValue + scope * (Math::cos(v) + 1.0) / 2.0;
-        if (v < minValue)
-            v = minValue;
-        if (v > maxValue)
-            v = maxValue;
-        result = Variant(Variant::Float64, v);
-    } else if (String::equals(registerStr, "onoff", true)) {
-        int v = row % 2;
-        result = Variant(Variant::Integer32, v);
-    } else if (String::equals(registerStr, "time", true)) {
-        DateTime tMinValue, tMaxValue;
-        String rangeStr = String::trim(style["range"], '\'', '"', ' ');
-        if (String::equals(rangeStr, "today", true)) {
-            DateTime now = DateTime::now();
-            tMinValue = now.date();
-            tMaxValue = now.date().addDays(1);
-//            printf("today minValue: %s, maxValue: %s\n", tMinValue.toString().c_str(), tMaxValue.toString().c_str());
-        } else if (String::equals(rangeStr, "yesterday", true)) {
-            DateTime now = DateTime::now();
-            tMinValue = now.date().addDays(-1);
-            tMaxValue = now.date();
-//            printf("yesterday minValue: %s, maxValue: %s\n", tMinValue.toString().c_str(), tMaxValue.toString().c_str());
-        } else if (String::equals(rangeStr, "thismonth", true)) {
-            DateTime now = DateTime::now();
-            tMinValue = DateTime(now.year(), now.month(), 1);
-            tMaxValue = tMinValue.addMonths(1);
-//            printf("yesterday minValue: %s, maxValue: %s\n", tMinValue.toString().c_str(), tMaxValue.toString().c_str());
-        } else if (String::equals(rangeStr, "datetime", true) ||
-                   String::equals(rangeStr, "month", true)) {
-            DateTime::parse(filter.getFromValue(name), tMinValue);
-            DateTime::parse(filter.getToValue(name), tMaxValue);
+Variant Column::getCellValue(const Table *table, const SqlSelectFilter &filter, int row, int col) const {
+    const Rows &rows = table->rows;
+    if (rows.count() > 0) {
+        if (row < rows.count()) {
+            auto cells = rows[row].cells();
+            const String &cellValue = col < cells.count() ? cells[col] : String::Empty;
+            Variant value(type(), cellValue);
+            return value;
         } else {
-            StringArray ranges;
-            StringArray::parse(rangeStr, ranges, '~');
-            if (ranges.count() == 2) {
-                DateTime::parse(ranges[0], tMinValue);
-                DateTime::parse(ranges[1], tMaxValue);
-                DateTime now = DateTime::now();
-                static const DateTime AD1 = DateTime(1, 1, 1);
-                if (tMinValue.date() == AD1) {
-                    tMinValue = now.date() + tMinValue.timeOfDay();
-                }
-                if (tMaxValue.date() == AD1) {
-                    tMaxValue = now.date() + tMaxValue.timeOfDay();
-                }
-//                printf("min time: %s, max time: %s\n", tMinValue.toString().c_str(), tMaxValue.toString().c_str());
-            }
+            return Variant::NullValue;
         }
-        TimeSpan tStep;
-        TimeSpan::parse(String::trim(style["step"], '\'', '"', ' '), tStep);
-        String formatStr = String::trim(style["format"], '\'', '"', ' ');
-        if (!(tMinValue == DateTime::MinValue && tMaxValue == DateTime::MaxValue &&
-              tStep == TimeSpan::Zero && !formatStr.isNullOrEmpty())) {
-            bool upToNow = false;
-            Boolean::parse(style["upToNow"], upToNow);
-            if (upToNow) {
-                tMaxValue = DateTime::now();
-            }
-            DateTime v = tMinValue.addTicks(tStep.ticks() * row);
-//            printf("name: %s, v: %s, step: %s\n", name.c_str(), v.toString().c_str(), tStep.toString().c_str());
-            if (v <= tMaxValue) {
-                result = Variant(Variant::Text, v.toString(formatStr));
-            }
-        }
-    } else if (String::equals(registerStr, "array", true)) {
-        StringArray texts;
-        StringArray::parse(style.toString(), texts, ',');
-        if (!filter.orderBy().isNullOrEmpty()) {
-            StringArray orders;
-            StringArray::parse(filter.orderBy(), orders, ' ');
-            if (orders.count() == 2 && String::equals(orders[0].trim(), name, true)) {
-                String order = orders[1].trim();
-                if (String::equals(order, "asc", true)) {
-                    texts.sort(true);
-                } else if (String::equals(order, "desc", true)) {
-                    texts.sort(false);
-                }
-            }
-        }
-        if (row < texts.count()) {
-            result = Variant(Variant::Text, String::trim(texts[row], '\'', '"', ' '));
-        } else {
-            result = Variant(Variant::Text, String::Empty);
-        }
-    } else if (String::equals(registerStr, "uuid", true)) {
-        result = Variant(Variant::Text, Uuid::generate().toString());
-    } else if (String::equals(registerStr, "incoming", true)) {
-        result = Variant(Variant::Text, filter.getValue(name));
     } else {
-        double v;
-        if (Double::parse(registerStr, v)) {
-            result = Variant(Variant::Float64, v);
-        } else {
-            result = Variant(Variant::Text, registerStr);
+        double minValue, maxValue, step;
+        if (!parseRange(style, minValue, maxValue, step)) {
+            minValue = table->minValue;
+            maxValue = table->maxValue;
+            step = table->step;
         }
+
+        Variant result;
+        if (String::equals(registerStr, "increase", true)) {
+            int maxValueRowCount = (int) Math::round((maxValue - minValue) / step + 0.5);
+            double v = minValue;
+            v += step * (row % maxValueRowCount);
+            result = Variant(Variant::Float64, v);
+        } else if (String::equals(registerStr, "decrease", true)) {
+            int maxValueRowCount = (int) Math::round((maxValue - minValue) / step + 0.5);
+            double v = maxValue;
+            v -= step * (row % maxValueRowCount);
+            result = Variant(Variant::Float64, v);
+        } else if (String::equals(registerStr, "random", true)) {
+            double v = Random::getRandValue(minValue, maxValue);
+            result = Variant(Variant::Float64, v);
+        } else if (String::equals(registerStr, "sin", true)) {
+            double v = minValue;
+            v += step * row;
+            double scope = maxValue - minValue + step;
+            v = minValue + scope * (Math::sin(v) + 1.0) / 2.0;
+            if (v < minValue)
+                v = minValue;
+            if (v > maxValue)
+                v = maxValue;
+            result = Variant(Variant::Float64, v);
+        } else if (String::equals(registerStr, "cos", true)) {
+            double v = minValue;
+            v += step * row;
+            double scope = maxValue - minValue + step;
+            v = minValue + scope * (Math::cos(v) + 1.0) / 2.0;
+            if (v < minValue)
+                v = minValue;
+            if (v > maxValue)
+                v = maxValue;
+            result = Variant(Variant::Float64, v);
+        } else if (String::equals(registerStr, "onoff", true)) {
+            int v = row % 2;
+            result = Variant(Variant::Integer32, v);
+        } else if (String::equals(registerStr, "time", true)) {
+            DateTime tMinValue, tMaxValue;
+            String rangeStr = String::trim(style["range"], '\'', '"', ' ');
+            if (String::equals(rangeStr, "today", true)) {
+                DateTime now = DateTime::now();
+                tMinValue = now.date();
+                tMaxValue = now.date().addDays(1);
+//            printf("today minValue: %s, maxValue: %s\n", tMinValue.toString().c_str(), tMaxValue.toString().c_str());
+            } else if (String::equals(rangeStr, "yesterday", true)) {
+                DateTime now = DateTime::now();
+                tMinValue = now.date().addDays(-1);
+                tMaxValue = now.date();
+//            printf("yesterday minValue: %s, maxValue: %s\n", tMinValue.toString().c_str(), tMaxValue.toString().c_str());
+            } else if (String::equals(rangeStr, "thismonth", true)) {
+                DateTime now = DateTime::now();
+                tMinValue = DateTime(now.year(), now.month(), 1);
+                tMaxValue = tMinValue.addMonths(1);
+//            printf("yesterday minValue: %s, maxValue: %s\n", tMinValue.toString().c_str(), tMaxValue.toString().c_str());
+            } else if (String::equals(rangeStr, "datetime", true) ||
+                       String::equals(rangeStr, "month", true)) {
+                DateTime::parse(filter.getFromValue(name), tMinValue);
+                DateTime::parse(filter.getToValue(name), tMaxValue);
+            } else {
+                StringArray ranges;
+                StringArray::parse(rangeStr, ranges, '~');
+                if (ranges.count() == 2) {
+                    DateTime::parse(ranges[0], tMinValue);
+                    DateTime::parse(ranges[1], tMaxValue);
+                    DateTime now = DateTime::now();
+                    static const DateTime AD1 = DateTime(1, 1, 1);
+                    if (tMinValue.date() == AD1) {
+                        tMinValue = now.date() + tMinValue.timeOfDay();
+                    }
+                    if (tMaxValue.date() == AD1) {
+                        tMaxValue = now.date() + tMaxValue.timeOfDay();
+                    }
+//                printf("min time: %s, max time: %s\n", tMinValue.toString().c_str(), tMaxValue.toString().c_str());
+                }
+            }
+            TimeSpan tStep;
+            TimeSpan::parse(String::trim(style["step"], '\'', '"', ' '), tStep);
+            String formatStr = String::trim(style["format"], '\'', '"', ' ');
+            if (!(tMinValue == DateTime::MinValue && tMaxValue == DateTime::MaxValue &&
+                  tStep == TimeSpan::Zero && !formatStr.isNullOrEmpty())) {
+                bool upToNow = false;
+                Boolean::parse(style["upToNow"], upToNow);
+                if (upToNow) {
+                    tMaxValue = DateTime::now();
+                }
+                DateTime v = tMinValue.addTicks(tStep.ticks() * row);
+//            printf("name: %s, v: %s, step: %s\n", name.c_str(), v.toString().c_str(), tStep.toString().c_str());
+                if (v <= tMaxValue) {
+                    result = Variant(Variant::Text, v.toString(formatStr));
+                }
+            }
+        } else if (String::equals(registerStr, "array", true)) {
+            StringArray texts;
+            StringArray::parse(style.toString(), texts, ',');
+            if (!filter.orderBy().isNullOrEmpty()) {
+                StringArray orders;
+                StringArray::parse(filter.orderBy(), orders, ' ');
+                if (orders.count() == 2 && String::equals(orders[0].trim(), name, true)) {
+                    String order = orders[1].trim();
+                    if (String::equals(order, "asc", true)) {
+                        texts.sort(true);
+                    } else if (String::equals(order, "desc", true)) {
+                        texts.sort(false);
+                    }
+                }
+            }
+            if (row < texts.count()) {
+                result = Variant(Variant::Text, String::trim(texts[row], '\'', '"', ' '));
+            } else {
+                result = Variant(Variant::Text, String::Empty);
+            }
+        } else if (String::equals(registerStr, "map", true)) {
+            String key = String::trim(style["key"], '\'', '"', ' ');
+            if (key.isNullOrEmpty()) {
+                key = String::trim(style["_key"], '\'', '"', ' ');
+            }
+            if (key.isNullOrEmpty()) {
+                key = String::trim(style["keyName"], '\'', '"', ' ');
+            }
+            if (key.isNullOrEmpty()) {
+                key = String::trim(style["_keyName"], '\'', '"', ' ');
+            }
+
+            if (!key.isNullOrEmpty()) {
+                String value = filter.getValue(key);
+                String arrayStr = String::trim(style[value], '\'', '"', ' ');
+                StringArray texts;
+                StringArray::parse(arrayStr, texts, ',');
+                if (!filter.orderBy().isNullOrEmpty()) {
+                    StringArray orders;
+                    StringArray::parse(filter.orderBy(), orders, ' ');
+                    if (orders.count() == 2 && String::equals(orders[0].trim(), name, true)) {
+                        String order = orders[1].trim();
+                        if (String::equals(order, "asc", true)) {
+                            texts.sort(true);
+                        } else if (String::equals(order, "desc", true)) {
+                            texts.sort(false);
+                        }
+                    }
+                }
+                if (row < texts.count()) {
+                    result = Variant(Variant::Text, String::trim(texts[row], '\'', '"', ' '));
+                } else {
+                    result = Variant(Variant::Text, String::Empty);
+                }
+            }
+        } else if (String::equals(registerStr, "uuid", true)) {
+            result = Variant(Variant::Text, Uuid::generate().toString());
+        } else if (String::equals(registerStr, "incoming", true)) {
+            result = Variant(Variant::Text, filter.getValue(name));
+        } else {
+            double v;
+            if (Double::parse(registerStr, v)) {
+                result = Variant(Variant::Float64, v);
+            } else {
+                result = Variant(Variant::Text, registerStr);
+            }
+        }
+        return result;
     }
-    return result;
 }
 
 DbType Column::type() const {
@@ -844,23 +891,55 @@ bool Columns::atByName(const String &name, Column &column) const {
     return false;
 }
 
-Table::Table() : Element(), rowCount(0) {
+Row::Row(const String &rowStr) {
+    StringArray cells;
+    StringArray::parse(rowStr, cells, ',');
+    for (size_t i = 0; i < cells.count(); ++i) {
+        _cells.add(cells[i].trim('\'', '"', ' '));
+    }
 }
 
-Table::Table(const Table &other) : Element(other), rowCount(0) {
+Row::Row(const StringArray &cells) : _cells(cells) {
+}
+
+Row::Row(const Row &row) : _cells(row._cells) {
+}
+
+bool Row::equals(const Row &other) const {
+    return _cells.equals(other._cells);
+}
+
+void Row::evaluates(const Row &other) {
+    _cells.evaluates(other._cells);
+}
+
+const StringArray &Row::cells() const {
+    return _cells;
+}
+
+String Row::toString() const {
+    return _cells.toString(',');
+}
+
+Table::Table() : Element(), _rowCount(0) {
+}
+
+Table::Table(const Table &other) : Element(other), _rowCount(0) {
     Table::evaluates(other);
 }
 
 bool Table::equals(const Table &other) const {
     return Element::equals(other) &&
-           this->rowCount == other.rowCount &&
-           this->columns == other.columns;
+           this->_rowCount == other._rowCount &&
+           this->columns == other.columns &&
+           this->rows == other.rows;
 }
 
 void Table::evaluates(const Table &other) {
     Element::evaluates(other);
-    this->rowCount = other.rowCount;
+    this->_rowCount = other._rowCount;
     this->columns = other.columns;
+    this->rows = other.rows;
 }
 
 DataRow Table::toDataRow(const DataTable &table) const {
@@ -868,8 +947,9 @@ DataRow Table::toDataRow(const DataTable &table) const {
                            DataCell(table.columns()["name"], name),
                            DataCell(table.columns()["range"], toRangeStr()),
                            DataCell(table.columns()["step"], step),
-                           DataCell(table.columns()["rowCount"], rowCount),
-                           DataCell(table.columns()["columns"], toValuesStr()),
+                           DataCell(table.columns()["rowCount"], _rowCount),
+                           DataCell(table.columns()["columns"], toColumnsStr()),
+                           DataCell(table.columns()["rows"], toRowsStr()),
                    });
 }
 
@@ -908,9 +988,29 @@ JsonNode Table::toJsonNode() const {
     node.add(JsonNode("name", name));
     node.add(JsonNode("range", toRangeStr()));
     node.add(JsonNode("step", step));
-    node.add(JsonNode("rowCount", rowCount));
-    node.add(JsonNode("columns", toValuesStr()));
+    node.add(JsonNode("rowCount", _rowCount));
+    node.add(JsonNode("columns", toColumnsStr()));
+    node.add(JsonNode("Rows", toRowsStr()));
     return node;
+}
+
+int Table::rowCount() const {
+    return rows.count() > 0 ? (int) rows.count() : _rowCount;
+}
+
+String Table::toColumnsStr() const {
+    return toValuesStr();
+}
+
+String Table::toRowsStr() const {
+    JsonNode result("rows", JsonNode::TypeArray);
+    for (size_t i = 0; i < rows.count(); ++i) {
+        const Row &row = rows[i];
+        JsonNode node;
+        node.add(JsonNode("cells", row.toString()));
+        result.add(node);
+    }
+    return result.toString();
 }
 
 bool Table::getColumns(const StringArray &colNames, Columns &cols) const {
@@ -932,12 +1032,16 @@ void Table::updateYmlProperties(YmlNode::Properties &properties, int pos) const 
     properties.add(String::format(TablePrefix "name", pos), name);
     properties.add(String::format(TablePrefix "range", pos), toRangeStr());
     properties.add(String::format(TablePrefix "step", pos), step);
-    properties.add(String::format(TablePrefix "rowCount", pos), rowCount);
+    properties.add(String::format(TablePrefix "rowCount", pos), _rowCount);
     for (size_t i = 0; i < columns.count(); ++i) {
         const Column &column = columns[i];
         properties.add(String::format(ColumnPrefix "name", pos, i), column.name);
         properties.add(String::format(ColumnPrefix "register", pos, i), column.registerStr);
         properties.add(String::format(ColumnPrefix "style", pos, i), column.style);
+    }
+    for (size_t i = 0; i < rows.count(); ++i) {
+        const Row &row = rows[i];
+        properties.add(String::format(RowPrefix "row", pos, i), row.toString());
     }
 }
 
@@ -952,6 +1056,11 @@ void Table::removeYmlProperties(YmlNode::Properties &properties, int pos) const 
         properties.remove(String::format(ColumnPrefix "name", pos, i));
         properties.remove(String::format(ColumnPrefix "register", pos, i));
         properties.remove(String::format(ColumnPrefix "style", pos, i));
+    }
+    properties.remove(String::format(TablePrefix "rows", pos));
+    for (size_t i = 0; i < rows.count(); ++i) {
+        const Row &row = rows[i];
+        properties.remove(String::format(RowPrefix "row", pos, i));
     }
 }
 
@@ -973,6 +1082,19 @@ bool Table::parseColumns(const String &str, Columns &columns) {
     return false;
 }
 
+bool Table::parseRows(const String &str, Rows &rows) {
+    JsonNode rowsNode;
+    if (JsonNode::parse(str, rowsNode)) {
+        for (size_t i = 0; i < rowsNode.count(); ++i) {
+            JsonNode node = rowsNode.at(i);
+            Row row(node.getAttribute("cells").trim());
+            rows.add(row);
+        }
+        return rows.count() > 0;
+    }
+    return false;
+}
+
 bool Table::parse(const StringMap &request, Table &table) {
     if (!request.at("name", table.name)) {
         return false;
@@ -983,10 +1105,13 @@ bool Table::parse(const StringMap &request, Table &table) {
     if (!Double::parse(request["step"], table.step)) {
         return false;
     }
-    if (!Int32::parse(request["rowCount"], table.rowCount)) {
+    if (!Int32::parse(request["rowCount"], table._rowCount)) {
         return false;
     }
     if (!Table::parseColumns(request["columns"], table.columns)) {
+        return false;
+    }
+    if (!Table::parseRows(request["rows"], table.rows)) {
         return false;
     }
     return true;
@@ -1001,7 +1126,7 @@ bool Table::parse(const YmlNode::Properties &properties, int pos, Table &table) 
         properties.at(String::format(TablePrefix "range", pos), range);
         Table::parseRange(range, table.minValue, table.maxValue);
         properties.at(String::format(TablePrefix "step", pos), table.step);
-        properties.at(String::format(TablePrefix "rowCount", pos), table.rowCount);
+        properties.at(String::format(TablePrefix "rowCount", pos), table._rowCount);
         for (int j = 0; j < MaxColumnCount; j++) {
             Column column;
             if (!properties.at(String::format(ColumnPrefix "name", pos, j), column.name)) {
@@ -1010,6 +1135,14 @@ bool Table::parse(const YmlNode::Properties &properties, int pos, Table &table) 
             properties.at(String::format(ColumnPrefix "register", pos, j), column.registerStr);
             properties.at(String::format(ColumnPrefix "style", pos, j), column.style);
             table.columns.add(column);
+        }
+        for (int j = 0; j < MaxRowCount; j++) {
+            String rowStr;
+            if (!properties.at(String::format(RowPrefix "row", pos, j), rowStr)) {
+                break;
+            }
+            Row row(rowStr);
+            table.rows.add(row);
         }
         return true;
     }
@@ -1020,7 +1153,7 @@ bool Table::parse(const DataRow &row, Table &table) {
     if (!row["name"].value().getValue(table.name)) {
         return false;
     }
-    if (!row["row_count"].value().getValue(table.rowCount)) {
+    if (!row["row_count"].value().getValue(table._rowCount)) {
         return false;
     }
     if (!row["min_value"].value().getValue(table.minValue)) {
@@ -1035,6 +1168,9 @@ bool Table::parse(const DataRow &row, Table &table) {
     if (!Table::parseColumns(row["columns"].valueStr(), table.columns)) {
         return false;
     }
+    if (!Table::parseRows(row["rows"].valueStr(), table.rows)) {
+        return false;
+    }
     return true;
 }
 
@@ -1047,7 +1183,7 @@ String Table::toInsertSqlStr(const String &prefix) const {
     sql = String::format("INSERT INTO %s VALUES(%lld,'%s',%d,%llg,%llg,%llg,'%s','','%s','');",
                          tableTableName.c_str(),
                          lid, name.c_str(),
-                         rowCount, minValue, maxValue, step,
+                         _rowCount, minValue, maxValue, step,
                          now.toString().c_str(), now.toString().c_str());
     for (size_t i = 0; i < columns.count(); ++i) {
         const Column &column = columns[i];
@@ -1068,7 +1204,7 @@ String Table::toReplaceSqlStr(const String &prefix) const {
     sql = String::format(
             "UPDATE %s SET row_count=%d,min_value=%llg,max_value=%llg,step=%llg,update_time='%s',update_user='' WHERE name='%s';",
             tableTableName.c_str(),
-            rowCount, minValue, maxValue, step,
+            _rowCount, minValue, maxValue, step,
             now.toString().c_str(), name.c_str());
     String idSelectStr = String::format("(SELECT id FROM %s WHERE name='%s')", tableTableName.c_str(), name.c_str());
     sql.appendLine(String::format("DELETE FROM %s WHERE table_id=%s", columnTableName.c_str(), idSelectStr.c_str()));
