@@ -17,6 +17,7 @@ project(tserver)
 option(TSERVER_STATIC_STDLIB "Option for build with static libstdc++" OFF)
 option(TSERVER_ENABLE_TEST "Option for build with test" ON)
 option(TSERVER_BUILD_KINGBASE "Option for build with Kingbase" OFF)
+option(TSERVER_BUILD_DM6 "Option for build with dm6" OFF)
 
 ## build settings
 set(TSERVER_VERSION_MAJOR 1)
@@ -62,6 +63,7 @@ endif ()
 message(STATUS "TSERVER_STATIC_STDLIB: " ${TSERVER_STATIC_STDLIB})
 message(STATUS "TSERVER_ENABLE_TEST: " ${TSERVER_ENABLE_TEST})
 message(STATUS "TSERVER_BUILD_KINGBASE: " ${TSERVER_BUILD_KINGBASE})
+message(STATUS "TSERVER_BUILD_DM6: " ${TSERVER_BUILD_DM6})
 
 # set externals path.
 set(EXTERNALS_PATH ${CMAKE_SOURCE_DIR}/externals)
