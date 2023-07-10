@@ -1,0 +1,12 @@
+[Unit]
+Description=tserver.zjk_ss
+After=network.target
+
+[Service]
+Type=forking
+Restart=always
+ExecStart=/usr/local/tserver/tserver -d
+EnvironmentFile=-/usr/local/tserver/tserver.conf
+
+[Install]
+WantedBy=multi-user.target
