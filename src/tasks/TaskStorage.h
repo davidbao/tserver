@@ -10,7 +10,7 @@
 #define TSERVER_TASKSTORAGE_H
 
 #include "TaskContext.h"
-#include "database/DbClient.h"
+#include "database/SqlConnection.h"
 
 using namespace Database;
 
@@ -70,7 +70,7 @@ private:
     static String getTableName(const String &tableName);
 
 private:
-    DbClient *_dbClient;
+    SqlConnection _connection;
 };
 
 

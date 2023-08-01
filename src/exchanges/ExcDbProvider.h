@@ -11,7 +11,7 @@
 
 #include "system/ServiceFactory.h"
 #include "database/SqlSelectFilter.h"
-#include "database/DbClient.h"
+#include "database/SqlConnection.h"
 #include "ExcContext.h"
 
 using namespace Database;
@@ -29,7 +29,7 @@ public:
                                const SqlSelectFilter &filter, DataTable &table) override;
 
 private:
-    DbClient *dbClient() const;
+    SqlConnection *connection() const;
 
 private:
     static void createSqlFile(const String &fileName, const String &sql);

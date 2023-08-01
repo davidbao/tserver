@@ -15,6 +15,7 @@
 #include "thread/Task.h"
 #include "system/Application.h"
 #include "crypto/Md5Provider.h"
+#include "database/SnowFlake.h"
 #include "TaskContext.h"
 #include "TaskDbService.h"
 
@@ -1107,7 +1108,7 @@ String Crontab::toInsertSqlStr(const String &prefix) const {
         String taskTableName = getTableName(prefix, TaskTableName);
         sql = String::format("INSERT INTO %s VALUES(%lld,'%s','%s','%s','%s','','%s','');",
                              taskTableName.c_str(),
-                             DbClient::generateSnowFlakeId(), name.c_str(),
+                             SnowFlake::generateId(), name.c_str(),
                              _schedule->toString().c_str(), _execution->toString().c_str(),
                              now.toString().c_str(), now.toString().c_str());
     }

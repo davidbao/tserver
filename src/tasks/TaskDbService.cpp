@@ -33,19 +33,18 @@ bool TaskDbService::unInitialize() {
     return true;
 }
 
-DbClient *TaskDbService::dbClient() const {
+SqlConnection *TaskDbService::connection() const {
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
     auto ds = factory->getService<IDataSourceService>();
     assert(ds);
-    DbClient *dbClient = ds->dbClient();
-    return dbClient;
+    return ds->connection();
 }
 
 bool TaskDbService::executeSql(const String &sql) {
-    DbClient *dbClient = this->dbClient();
-    if (dbClient != nullptr) {
-        return dbClient->executeSql(sql);
+    SqlConnection *connection = this->connection();
+    if (connection != nullptr) {
+        return connection->executeSql(sql);
     }
     return false;
 }

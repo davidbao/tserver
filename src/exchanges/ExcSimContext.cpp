@@ -9,7 +9,7 @@
 #include "thread/TickTimeout.h"
 #include "system/Random.h"
 #include "system/Math.h"
-#include "database/DbClient.h"
+#include "database/SnowFlake.h"
 #include "ExcSimContext.h"
 
 using namespace IO;
@@ -563,7 +563,7 @@ String Label::toCountSqlStr(const String &prefix, const SqlSelectFilter &filter)
 String Label::toInsertSqlStr(const String &prefix) const {
     String sql;
     DateTime now = DateTime::now();
-    uint64_t lid = DbClient::generateSnowFlakeId();
+    uint64_t lid = SnowFlake::generateId();
     String labelTableName = getTableName(prefix, LabelTableName);
     String tagTableName = getTableName(prefix, TagTableName);
     sql = String::format("INSERT INTO %s VALUES(%lld,'%s',%llg,%llg,%llg,'%s','','%s','');",
@@ -575,7 +575,7 @@ String Label::toInsertSqlStr(const String &prefix) const {
         const Tag &tag = tags[i];
         sql.appendLine(String::format("INSERT INTO %s VALUES(%lld,%lld,'%s','%s','%s','%s','','%s','');",
                                       tagTableName.c_str(),
-                                      DbClient::generateSnowFlakeId(), lid,
+                                      SnowFlake::generateId(), lid,
                                       tag.name.c_str(), tag.registerStr.c_str(), tag.style.toString().c_str(),
                                       now.toString().c_str(), now.toString().c_str()));
     }
@@ -598,7 +598,7 @@ String Label::toReplaceSqlStr(const String &prefix) const {
         const Tag &tag = tags[i];
         sql.appendLine(String::format("INSERT INTO %s VALUES(%lld,%s,'%s','%s','%s','%s','','%s','');",
                                       tagTableName.c_str(),
-                                      DbClient::generateSnowFlakeId(),
+                                      SnowFlake::generateId(),
                                       idSelectStr.c_str(),
                                       tag.name.c_str(), tag.registerStr.c_str(), tag.style.toString().c_str(),
                                       now.toString().c_str(), now.toString().c_str()));
@@ -1177,7 +1177,7 @@ bool Table::parse(const DataRow &row, Table &table) {
 String Table::toInsertSqlStr(const String &prefix) const {
     String sql;
     DateTime now = DateTime::now();
-    uint64_t lid = DbClient::generateSnowFlakeId();
+    uint64_t lid = SnowFlake::generateId();
     String tableTableName = getTableName(prefix, TableTableName);
     String columnTableName = getTableName(prefix, ColumnTableName);
     sql = String::format("INSERT INTO %s VALUES(%lld,'%s',%d,%llg,%llg,%llg,'%s','','%s','');",
@@ -1189,7 +1189,7 @@ String Table::toInsertSqlStr(const String &prefix) const {
         const Column &column = columns[i];
         sql.appendLine(String::format("INSERT INTO %s VALUES(%lld,%lld,'%s','%s','%s','%s','','%s','');",
                                       columnTableName.c_str(),
-                                      DbClient::generateSnowFlakeId(), lid,
+                                      SnowFlake::generateId(), lid,
                                       column.name.c_str(), column.registerStr.c_str(), column.style.toString().c_str(),
                                       now.toString().c_str(), now.toString().c_str()));
     }
@@ -1212,7 +1212,7 @@ String Table::toReplaceSqlStr(const String &prefix) const {
         const Column &column = columns[i];
         sql.appendLine(String::format("INSERT INTO %s VALUES(%lld,%s,'%s','%s','%s','%s','','%s','');",
                                       columnTableName.c_str(),
-                                      DbClient::generateSnowFlakeId(),
+                                      SnowFlake::generateId(),
                                       idSelectStr.c_str(),
                                       column.name.c_str(), column.registerStr.c_str(), column.style.toString().c_str(),
                                       now.toString().c_str(), now.toString().c_str()));

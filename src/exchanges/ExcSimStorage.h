@@ -10,7 +10,7 @@
 #define TSERVER_EXCSIMSTORAGE_H
 
 #include "ExcSimContext.h"
-#include "database/DbClient.h"
+#include "database/SqlConnection.h"
 
 using namespace Database;
 
@@ -94,7 +94,7 @@ private:
     static String getTableName(const String &tableName);
 
 private:
-    DbClient *_dbClient;
+    SqlConnection _connection;
 };
 
 #endif //TSERVER_EXCSIMSTORAGE_H

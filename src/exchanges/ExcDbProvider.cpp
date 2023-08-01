@@ -25,13 +25,12 @@ ExcDbProvider::ExcDbProvider() {
 
 ExcDbProvider::~ExcDbProvider() = default;
 
-DbClient *ExcDbProvider::dbClient() const {
+SqlConnection *ExcDbProvider::connection() const {
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
     auto *ds = factory->getService<IDataSourceService>();
     assert(ds);
-    DbClient *dbClient = ds->dbClient();
-    return dbClient;
+    return ds->connection();
 }
 
 void ExcDbProvider::createSqlFile(const String &fileName, const String &sql) {
@@ -44,8 +43,8 @@ void ExcDbProvider::createSqlFile(const String &fileName, const String &sql) {
 
 FetchResult ExcDbProvider::getLabelValues(const String &labelName, const StringArray &tagNames,
                                           const SqlSelectFilter &filter, VariantMap &values) {
-    DbClient *dbClient = this->dbClient();
-    if (dbClient == nullptr)
+    SqlConnection *connection = this->connection();
+    if (connection == nullptr)
         return FetchResult::DbError;
 
     String sql;
@@ -62,10 +61,10 @@ FetchResult ExcDbProvider::getLabelValues(const String &labelName, const StringA
 #endif
 
     DataTable table;
-    if (dbClient->executeSqlQuery(sql, table)) {
+    if (connection->executeSqlQuery(sql, table)) {
         const DataRows &rows = table.rows();
         if (rows.count() != 1) {
-            StringArray columnsNames = dbClient->getColumnName(labelName);
+            StringArray columnsNames = connection->getColumnName(labelName);
             for (size_t i = 0; i < columnsNames.count(); i++) {
                 const String &columnName = columnsNames.at(i);
                 if (tagNames.isEmpty()) {
@@ -101,8 +100,8 @@ FetchResult ExcDbProvider::getLabelValues(const String &labelName, const StringA
 
 FetchResult ExcDbProvider::getTableValues(const String &tableName, const StringArray &colNames,
                                           const SqlSelectFilter &filter, DataTable &table) {
-    DbClient *dbClient = this->dbClient();
-    if (dbClient == nullptr)
+    SqlConnection *connection = this->connection();
+    if (connection == nullptr)
         return FetchResult::DbError;
 
     String prefix = getTablePrefix();
@@ -118,7 +117,7 @@ FetchResult ExcDbProvider::getTableValues(const String &tableName, const StringA
     createSqlFile("getTableValues.sql", sql);
 #endif
 
-    if (dbClient->executeSqlQuery(sql, table)) {
+    if (connection->executeSqlQuery(sql, table)) {
         sql = getSql(tableName, 2);
         if (sql.isNullOrEmpty()) {
             sql = filter.toCountSql(name);
@@ -128,7 +127,7 @@ FetchResult ExcDbProvider::getTableValues(const String &tableName, const StringA
         createSqlFile("getTableCount.sql", sql);
 #endif
         int totalCount = 0;
-        if (dbClient->retrieveCount(sql, totalCount))
+        if (connection->retrieveCount(sql, totalCount))
             table.setTotalCount(totalCount);
         return FetchResult::Succeed;
     }

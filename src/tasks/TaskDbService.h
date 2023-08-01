@@ -11,7 +11,7 @@
 
 #include "system/ServiceFactory.h"
 #include "database/SqlSelectFilter.h"
-#include "database/DbClient.h"
+#include "database/SqlConnection.h"
 #include "TaskContext.h"
 
 using namespace Database;
@@ -30,10 +30,13 @@ public:
     bool executeSql(const String &sql);
 
 private:
-    DbClient *dbClient() const;
+    SqlConnection *connection() const;
 
 private:
     static void createSqlFile(const String &fileName, const String &sql);
+
+private:
+    SqlConnection *_connection;
 };
 
 #endif //TSERVER_TASKDBSERVICE_H

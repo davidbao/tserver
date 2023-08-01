@@ -206,12 +206,11 @@ bool TaskFile::saveFile(const YmlNode::Properties &properties) {
     return YmlNode::saveFile(fileName, properties);
 }
 
-TaskDatabase::TaskDatabase() : _dbClient(nullptr) {
+TaskDatabase::TaskDatabase() {
 }
 
 TaskDatabase::~TaskDatabase() {
-    delete _dbClient;
-    _dbClient = nullptr;
+    _connection.close();
 }
 
 bool TaskDatabase::load() {
@@ -223,15 +222,14 @@ bool TaskDatabase::load() {
     String userName = cs->getProperty(SimDbPrefix "username");
     String password = cs->getProperty(SimDbPrefix "password");
     String urlStr = cs->getProperty(SimDbPrefix "url");
-    _dbClient = DataSourceService::open(urlStr, userName, password);
-    return _dbClient != nullptr;
+    return _connection.open(urlStr, userName, password);
 }
 
 bool TaskDatabase::getTask(const String &name, Crontab &crontab) {
-    if (_dbClient != nullptr) {
+    if (_connection.isConnected()) {
         String sql = Crontab::toSelectSqlStr(getTablePrefix(), name);
         DataTable dataTable(TaskTableName);
-        if (_dbClient->executeSqlQuery(sql, dataTable) && dataTable.rowCount() == 1) {
+        if (_connection.executeSqlQuery(sql, dataTable) && dataTable.rowCount() == 1) {
             const DataRow &row = dataTable.rows()[0];
             return Crontab::parse(row, crontab);
         }
@@ -240,10 +238,10 @@ bool TaskDatabase::getTask(const String &name, Crontab &crontab) {
 }
 
 bool TaskDatabase::getTask(int pos, Crontab &crontab) {
-    if (_dbClient != nullptr) {
+    if (_connection.isConnected()) {
         String sql = Crontab::toSelectSqlStr(getTablePrefix(), pos);
         DataTable dataTable(TaskTableName);
-        if (_dbClient->executeSqlQuery(sql, dataTable) && dataTable.rowCount() == 1) {
+        if (_connection.executeSqlQuery(sql, dataTable) && dataTable.rowCount() == 1) {
             const DataRow &row = dataTable.rows()[0];
             return Crontab::parse(row, crontab);
         }
@@ -252,13 +250,13 @@ bool TaskDatabase::getTask(int pos, Crontab &crontab) {
 }
 
 bool TaskDatabase::getTasks(const SqlSelectFilter &filter, DataTable &table) {
-    if (_dbClient != nullptr) {
+    if (_connection.isConnected()) {
         String sql;
         sql = Crontab::toSelectSqlStr(getTablePrefix(), filter);
-        if (_dbClient->executeSqlQuery(sql, table)) {
+        if (_connection.executeSqlQuery(sql, table)) {
             sql = Crontab::toCountSqlStr(getTablePrefix(), filter);
             int totalCount = 0;
-            if (_dbClient->retrieveCount(sql, totalCount))
+            if (_connection.retrieveCount(sql, totalCount))
                 table.setTotalCount(totalCount);
             return true;
         }
@@ -267,7 +265,7 @@ bool TaskDatabase::getTasks(const SqlSelectFilter &filter, DataTable &table) {
 }
 
 bool TaskDatabase::addTask(const StringMap &request, StringMap &response) {
-    if (_dbClient != nullptr) {
+    if (_connection.isConnected()) {
         // parse from http request.
         Crontab crontab;
         if (!Crontab::parse(request, crontab)) {
@@ -284,7 +282,7 @@ bool TaskDatabase::addTask(const StringMap &request, StringMap &response) {
 
         // insert crontab record.
         String sql = crontab.toInsertSqlStr(getTablePrefix());
-        if (!_dbClient->executeSql(sql)) {
+        if (!_connection.executeSql(sql)) {
             // Simulator database error.
             response.addRange(HttpCode::at(SimulatorDbError));
             return false;
@@ -298,7 +296,7 @@ bool TaskDatabase::addTask(const StringMap &request, StringMap &response) {
 }
 
 bool TaskDatabase::updateTask(const StringMap &request, StringMap &response) {
-    if (_dbClient != nullptr) {
+    if (_connection.isConnected()) {
         // parse from http request.
         Crontab task;
         if (!Crontab::parse(request, task)) {
@@ -315,7 +313,7 @@ bool TaskDatabase::updateTask(const StringMap &request, StringMap &response) {
 
         // replace task record.
         String sql = task.toReplaceSqlStr(getTablePrefix());
-        if (!_dbClient->executeSql(sql)) {
+        if (!_connection.executeSql(sql)) {
             // Simulator database error.
             response.addRange(HttpCode::at(SimulatorDbError));
             return false;
@@ -329,7 +327,7 @@ bool TaskDatabase::updateTask(const StringMap &request, StringMap &response) {
 }
 
 bool TaskDatabase::removeTask(const StringMap &request, StringMap &response) {
-    if (_dbClient != nullptr) {
+    if (_connection.isConnected()) {
         StringArray names;
         StringArray::parseJson(request["name"], names);
 
@@ -347,7 +345,7 @@ bool TaskDatabase::removeTask(const StringMap &request, StringMap &response) {
             }
         }
 
-        if (!_dbClient->executeSql(sql)) {
+        if (!_connection.executeSql(sql)) {
             // Simulator database error.
             response.addRange(HttpCode::at(SimulatorDbError));
             return false;
@@ -361,11 +359,11 @@ bool TaskDatabase::removeTask(const StringMap &request, StringMap &response) {
 }
 
 bool TaskDatabase::getTaskId(const String &name, uint64_t &id) {
-    if (_dbClient != nullptr) {
+    if (_connection.isConnected()) {
         String sql = String::format("SELECT id FROM %s WHERE name='%s'",
                                     getTableName(TaskTableName).c_str(), name.c_str());
         DataTable dataTable(TaskTableName);
-        if (_dbClient->executeSqlQuery(sql, dataTable) && dataTable.rowCount() == 1) {
+        if (_connection.executeSqlQuery(sql, dataTable) && dataTable.rowCount() == 1) {
             return dataTable.rows()[0]["id"].value().getValue(id);
         }
     }
