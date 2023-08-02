@@ -360,11 +360,14 @@ bool ExcSimFile::saveFile(const YmlNode::Properties &properties) {
     return YmlNode::saveFile(fileName, properties);
 }
 
-ExcSimDatabase::ExcSimDatabase() {
+ExcSimDatabase::ExcSimDatabase() : _connection(nullptr) {
 }
 
 ExcSimDatabase::~ExcSimDatabase() {
-    _connection.close();
+    if (_connection != nullptr) {
+        delete _connection;
+        _connection = nullptr;
+    }
 }
 
 bool ExcSimDatabase::load() {
@@ -376,14 +379,15 @@ bool ExcSimDatabase::load() {
     String userName = cs->getProperty(SimDbPrefix "username");
     String password = cs->getProperty(SimDbPrefix "password");
     String urlStr = cs->getProperty(SimDbPrefix "url");
-    return _connection.open(urlStr, userName, password);
+    _connection = new SqlConnection(urlStr, userName, password);
+    return _connection->open();
 }
 
 bool ExcSimDatabase::getLabel(const String &name, Label &label) {
-    if (_connection.isConnected()) {
+    if (_connection->isConnected()) {
         String sql = Label::toSelectSqlStr(getTablePrefix(), name);
         DataTable dataTable(LabelTableName);
-        if (_connection.executeSqlQuery(sql, dataTable) && dataTable.rowCount() == 1) {
+        if (_connection->executeSqlQuery(sql, dataTable) && dataTable.rowCount() == 1) {
             const DataRow &row = dataTable.rows()[0];
             return Label::parse(row, label);
         }
@@ -392,13 +396,13 @@ bool ExcSimDatabase::getLabel(const String &name, Label &label) {
 }
 
 bool ExcSimDatabase::getLabels(const SqlSelectFilter &filter, DataTable &table) {
-    if (_connection.isConnected()) {
+    if (_connection->isConnected()) {
         String sql;
         sql = Label::toSelectSqlStr(getTablePrefix(), filter);
-        if (_connection.executeSqlQuery(sql, table)) {
+        if (_connection->executeSqlQuery(sql, table)) {
             sql = Label::toCountSqlStr(getTablePrefix(), filter);
             int totalCount = 0;
-            if(_connection.retrieveCount(sql, totalCount))
+            if(_connection->retrieveCount(sql, totalCount))
                 table.setTotalCount(totalCount);
             return true;
         }
@@ -407,7 +411,7 @@ bool ExcSimDatabase::getLabels(const SqlSelectFilter &filter, DataTable &table) 
 }
 
 bool ExcSimDatabase::addLabel(const StringMap &request, StringMap &response) {
-    if (_connection.isConnected()) {
+    if (_connection->isConnected()) {
         // parse from http request.
         Label label;
         if (!Label::parse(request, label)) {
@@ -424,7 +428,7 @@ bool ExcSimDatabase::addLabel(const StringMap &request, StringMap &response) {
 
         // insert label record.
         String sql = label.toInsertSqlStr(getTablePrefix());
-        if (!_connection.executeSql(sql)) {
+        if (!_connection->executeSql(sql)) {
             // Simulator database error.
             response.addRange(HttpCode::at(SimulatorDbError));
             return false;
@@ -438,7 +442,7 @@ bool ExcSimDatabase::addLabel(const StringMap &request, StringMap &response) {
 }
 
 bool ExcSimDatabase::updateLabel(const StringMap &request, StringMap &response) {
-    if (_connection.isConnected()) {
+    if (_connection->isConnected()) {
         // parse from http request.
         Label label;
         if (!Label::parse(request, label)) {
@@ -455,7 +459,7 @@ bool ExcSimDatabase::updateLabel(const StringMap &request, StringMap &response) 
 
         // replace label record.
         String sql = label.toReplaceSqlStr(getTablePrefix());
-        if (!_connection.executeSql(sql)) {
+        if (!_connection->executeSql(sql)) {
             // Simulator database error.
             response.addRange(HttpCode::at(SimulatorDbError));
             return false;
@@ -469,7 +473,7 @@ bool ExcSimDatabase::updateLabel(const StringMap &request, StringMap &response) 
 }
 
 bool ExcSimDatabase::removeLabel(const StringMap &request, StringMap &response) {
-    if (_connection.isConnected()) {
+    if (_connection->isConnected()) {
         StringArray names;
         StringArray::parseJson(request["name"], names);
 
@@ -477,7 +481,7 @@ bool ExcSimDatabase::removeLabel(const StringMap &request, StringMap &response) 
         String sql;
         for (size_t i = 0; i < names.count(); ++i) {
             sql.appendLine(Label::toDeleteSqlStr(getTablePrefix(), names[i]));
-            if (!_connection.executeSql(sql)) {
+            if (!_connection->executeSql(sql)) {
                 // Simulator database error.
                 response.addRange(HttpCode::at(SimulatorDbError));
                 return false;
@@ -492,10 +496,10 @@ bool ExcSimDatabase::removeLabel(const StringMap &request, StringMap &response) 
 }
 
 bool ExcSimDatabase::getTable(const String &name, Table &table) {
-    if (_connection.isConnected()) {
+    if (_connection->isConnected()) {
         String sql = Table::toSelectSqlStr(getTablePrefix(), name);
         DataTable dataTable(TableTableName);
-        if (_connection.executeSqlQuery(sql, dataTable) && dataTable.rowCount() == 1) {
+        if (_connection->executeSqlQuery(sql, dataTable) && dataTable.rowCount() == 1) {
             const DataRow &row = dataTable.rows()[0];
             return Table::parse(row, table);
         }
@@ -504,13 +508,13 @@ bool ExcSimDatabase::getTable(const String &name, Table &table) {
 }
 
 bool ExcSimDatabase::getTables(const SqlSelectFilter &filter, DataTable &table) {
-    if (_connection.isConnected()) {
+    if (_connection->isConnected()) {
         String sql;
         sql = Table::toSelectSqlStr(getTablePrefix(), filter);
-        if (_connection.executeSqlQuery(sql, table)) {
+        if (_connection->executeSqlQuery(sql, table)) {
             sql = Table::toCountSqlStr(getTablePrefix(), filter);
             int totalCount = 0;
-            if(_connection.retrieveCount(sql, totalCount))
+            if(_connection->retrieveCount(sql, totalCount))
                 table.setTotalCount(totalCount);
             return true;
         }
@@ -519,7 +523,7 @@ bool ExcSimDatabase::getTables(const SqlSelectFilter &filter, DataTable &table) 
 }
 
 bool ExcSimDatabase::addTable(const StringMap &request, StringMap &response) {
-    if (_connection.isConnected()) {
+    if (_connection->isConnected()) {
         // parse from http request.
         Table table;
         if (!Table::parse(request, table)) {
@@ -536,7 +540,7 @@ bool ExcSimDatabase::addTable(const StringMap &request, StringMap &response) {
 
         // insert table record.
         String sql = table.toInsertSqlStr(getTablePrefix());
-        if (!_connection.executeSql(sql)) {
+        if (!_connection->executeSql(sql)) {
             // Simulator database error.
             response.addRange(HttpCode::at(SimulatorDbError));
             return false;
@@ -550,7 +554,7 @@ bool ExcSimDatabase::addTable(const StringMap &request, StringMap &response) {
 }
 
 bool ExcSimDatabase::updateTable(const StringMap &request, StringMap &response) {
-    if (_connection.isConnected()) {
+    if (_connection->isConnected()) {
         // parse from http request.
         Table table;
         if (!Table::parse(request, table)) {
@@ -567,7 +571,7 @@ bool ExcSimDatabase::updateTable(const StringMap &request, StringMap &response) 
 
         // replace table record.
         String sql = table.toReplaceSqlStr(getTablePrefix());
-        if (!_connection.executeSql(sql)) {
+        if (!_connection->executeSql(sql)) {
             // Simulator database error.
             response.addRange(HttpCode::at(SimulatorDbError));
             return false;
@@ -581,7 +585,7 @@ bool ExcSimDatabase::updateTable(const StringMap &request, StringMap &response) 
 }
 
 bool ExcSimDatabase::removeTable(const StringMap &request, StringMap &response) {
-    if (_connection.isConnected()) {
+    if (_connection->isConnected()) {
         StringArray names;
         StringArray::parseJson(request["name"], names);
 
@@ -589,7 +593,7 @@ bool ExcSimDatabase::removeTable(const StringMap &request, StringMap &response) 
         String sql;
         for (size_t i = 0; i < names.count(); ++i) {
             sql.appendLine(Table::toDeleteSqlStr(getTablePrefix(), names[i]));
-            if (!_connection.executeSql(sql)) {
+            if (!_connection->executeSql(sql)) {
                 // Simulator database error.
                 response.addRange(HttpCode::at(SimulatorDbError));
                 return false;
@@ -604,11 +608,11 @@ bool ExcSimDatabase::removeTable(const StringMap &request, StringMap &response) 
 }
 
 bool ExcSimDatabase::getLabelId(const String &name, uint64_t &id) {
-    if (_connection.isConnected()) {
+    if (_connection->isConnected()) {
         String sql = String::format("SELECT id FROM %s WHERE name='%s'",
                                     getTableName(LabelTableName).c_str(), name.c_str());
         DataTable dataTable(LabelTableName);
-        if (_connection.executeSqlQuery(sql, dataTable) && dataTable.rowCount() == 1) {
+        if (_connection->executeSqlQuery(sql, dataTable) && dataTable.rowCount() == 1) {
             return dataTable.rows()[0]["id"].value().getValue(id);
         }
     }
@@ -621,11 +625,11 @@ bool ExcSimDatabase::containsLabel(const String &name) {
 }
 
 bool ExcSimDatabase::getTableId(const String &name, uint64_t &id) {
-    if (_connection.isConnected()) {
+    if (_connection->isConnected()) {
         String sql = String::format("SELECT id FROM %s WHERE name='%s'",
                                     getTableName(TableTableName).c_str(), name.c_str());
         DataTable dataTable(TableTableName);
-        if (_connection.executeSqlQuery(sql, dataTable) && dataTable.rowCount() == 1) {
+        if (_connection->executeSqlQuery(sql, dataTable) && dataTable.rowCount() == 1) {
             return dataTable.rows()[0]["id"].value().getValue(id);
         }
     }

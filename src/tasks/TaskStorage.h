@@ -70,7 +70,7 @@ private:
     static String getTableName(const String &tableName);
 
 private:
-    SqlConnection _connection;
+    SqlConnection *_connection;
 };
 
 
