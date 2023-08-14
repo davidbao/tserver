@@ -49,6 +49,11 @@ private:
 
 #define MaxTableCount 1000
 #define DbTablePrefix DatabasePrefix "tables[%d]."
+
+#define LogPrefix DatabasePrefix "log."
+
+private:
+    bool _logSqlInfo;
 };
 
 

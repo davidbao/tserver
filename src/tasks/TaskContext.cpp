@@ -16,6 +16,7 @@
 #include "system/Application.h"
 #include "crypto/Md5Provider.h"
 #include "database/SnowFlake.h"
+#include "diag/Stopwatch.h"
 #include "TaskContext.h"
 #include "TaskDbService.h"
 
@@ -114,22 +115,26 @@ const String &AppExecution::param() const {
     return _param;
 }
 
-bool AppExecution::execute() {
+Execution::Result AppExecution::execute() {
     String fileName = currentFile();
     if (File::exists(fileName)) {
-        bool result;
         if (_sync) {
             Process process;
             process.setRedirectStdout(true);
             process.setWaitingTimeout(_timeout);
-            result = Process::start(fileName, _param, &process);
+            bool result = Process::start(fileName, _param, &process);
             Trace::info(process.stdoutStr());
+            if (result) {
+                return !process.exist() ? Execution::Succeed : Execution::Timeout;
+            } else {
+                return Execution::FailedToStartProcess;
+            }
         } else {
-            result = Process::start(fileName, _param);
+            bool result = Process::start(fileName, String::format("%s &", _param.c_str()));
+            return result ? Execution::Succeed : Execution::FailedToStartProcess;
         }
-        return result;
     }
-    return false;
+    return Execution::NotFound;
 }
 
 JsonNode AppExecution::toJsonNode() const {
@@ -204,7 +209,7 @@ bool SqlExecution::isFile() const {
     return !_fileName.isNullOrEmpty();
 }
 
-bool SqlExecution::execute() {
+Execution::Result SqlExecution::execute() {
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
     auto ss = factory->getService<TaskDbService>();
@@ -212,10 +217,10 @@ bool SqlExecution::execute() {
 
     if (!_sql.isNullOrEmpty()) {
         if (_sync) {
-            return ss->executeSql(_sql);
+            return ss->executeSql(_sql) ? Execution::Succeed : Execution::FailedToExecuteSql;
         } else {
             Task::run(&TaskDbService::executeSql, ss, _sql);
-            return true;
+            return Execution::Succeed;
         }
     } else {
         String fileName;
@@ -227,15 +232,15 @@ bool SqlExecution::execute() {
         if (File::exists(fileName)) {
             String sql = File::readAllText(fileName);
             if (_sync) {
-                return ss->executeSql(sql);
+                return ss->executeSql(sql) ? Execution::Succeed : Execution::FailedToExecuteSql;
             } else {
                 Task::run(&TaskDbService::executeSql, ss, sql);
-                return true;
+                return Execution::Succeed;
             }
         } else {
             Trace::error(String::format("Can not find the execution sql file'%s'!", fileName.c_str()));
+            return Execution::NotFound;
         }
-        return false;
     }
 }
 
@@ -319,7 +324,7 @@ bool PythonExecution::isFile() const {
     return !_fileName.isNullOrEmpty();
 }
 
-bool PythonExecution::execute() {
+Execution::Result PythonExecution::execute() {
     String fileName;
     if (!_script.isNullOrEmpty()) {
         fileName = Path::getTempFileName("tserver");
@@ -333,20 +338,28 @@ bool PythonExecution::execute() {
             fileName = _fileName;
         }
     }
+
     if (File::exists(fileName)) {
-        bool result;
         String param = !_param.isNullOrEmpty() ?
                        String::format("%s %s", fileName.c_str(), _param.c_str()) :
                        fileName;
         static const char *PythonApp = "python";
+
+        Execution::Result result;
         if (_sync) {
             Process process;
             process.setRedirectStdout(true);
             process.setWaitingTimeout(_timeout);
-            result = Process::start(PythonApp, param, &process);
+            bool r = Process::start(PythonApp, param, &process);
             Trace::info(process.stdoutStr());
+            if (r) {
+                result = !process.exist() ? Execution::Succeed : Execution::Timeout;
+            } else {
+                result = Execution::FailedToStartProcess;
+            }
         } else {
-            result = Process::start(PythonApp, param);
+            bool r = Process::start(PythonApp, String::format("%s &", param.c_str()));
+            result = r ? Execution::Succeed : Execution::FailedToStartProcess;
         }
         if (!_script.isNullOrEmpty()) {
             File::deleteFile(fileName);
@@ -354,8 +367,8 @@ bool PythonExecution::execute() {
         return result;
     } else {
         Trace::error(String::format("Can not find the execution python file'%s'!", fileName.c_str()));
+        return Execution::NotFound;
     }
-    return false;
 }
 
 JsonNode PythonExecution::toJsonNode() const {
@@ -446,17 +459,32 @@ JsonNode CycleSchedule::toJsonNode() const {
     return node;
 }
 
-const TimeSpan TimingSchedule::MinDeadZone = TimeSpan::fromMinutes(5);
-const TimeSpan TimingSchedule::SecDeadZone = TimeSpan::fromSeconds(5);
+TimingSchedule::TimingSchedule() {
+    _minDeadZone = TimeSpan::fromMinutes(5);
+    _secDeadZone = TimeSpan::fromSeconds(5);
+}
 
-TimingSchedule::TimingSchedule(const DateTime &time, const String &repeatType, const String &repeatValue) :
-        _time(time), _repeatType(repeatType), _repeatValue(repeatValue) {
+TimingSchedule::TimingSchedule(std::initializer_list<KeyValuePair<String, String>> list) : TimingSchedule() {
+    for (const auto &item: list) {
+        if (String::equals(item.key, "time")) {
+            DateTime::parse(item.value, _time);
+        } else if (String::equals(item.key, "repeatType")) {
+            _repeatType = item.value;
+        } else if (String::equals(item.key, "repeatValue")) {
+            _repeatValue = item.value;
+        } else if (String::equals(item.key, "minDeadZone")) {
+            TimeSpan::parse(item.value, _minDeadZone);
+        } else if (String::equals(item.key, "secDeadZone")) {
+            TimeSpan::parse(item.value, _secDeadZone);
+        }
+    }
 }
 
 bool TimingSchedule::equals(const Schedule &other) const {
     auto p = dynamic_cast<const TimingSchedule *>(&other);
     assert(p);
-    return _time == p->_time && _repeatType == p->_repeatType && _repeatValue == p->_repeatValue;
+    return _time == p->_time && _repeatType == p->_repeatType && _repeatValue == p->_repeatValue &&
+           _minDeadZone == p->_minDeadZone && _secDeadZone == p->_secDeadZone;
 }
 
 void TimingSchedule::evaluates(const Schedule &other) {
@@ -465,6 +493,9 @@ void TimingSchedule::evaluates(const Schedule &other) {
     _time = p->_time;
     _repeatType = p->_repeatType;
     _repeatValue = p->_repeatValue;
+
+    _minDeadZone = p->_minDeadZone;
+    _secDeadZone = p->_secDeadZone;
 }
 
 Schedule *TimingSchedule::clone() const {
@@ -566,23 +597,23 @@ bool TimingSchedule::isTimeUp(const String &taskName, Types type) {
     if (type == Types::S) {
         DateTime time = DateTime(now.year(), now.month(), now.day(),
                                  now.hour(), now.minute(), _time.second(), 0, now.kind());
-        return isTimeUp(taskName, now, time, SecDeadZone);
+        return isTimeUp(taskName, now, time, _secDeadZone);
     } else if (type == Types::MS) {
         DateTime time = DateTime(now.year(), now.month(), now.day(),
                                  now.hour(), _time.minute(), _time.second(), 0, now.kind());
-        return isTimeUp(taskName, now, time, MinDeadZone);
+        return isTimeUp(taskName, now, time, _minDeadZone);
     } else if (type == Types::HM) {
         DateTime time = DateTime(now.year(), now.month(), now.day(),
                                  _time.hour(), _time.minute(), 0, 0, now.kind());
-        return isTimeUp(taskName, now, time, MinDeadZone);
+        return isTimeUp(taskName, now, time, _minDeadZone);
     } else if (type == Types::DHM) {
         DateTime time = DateTime(now.year(), now.month(), _time.day(),
                                  _time.hour(), _time.minute(), 0, 0, now.kind());
-        return isTimeUp(taskName, now, time, MinDeadZone);
+        return isTimeUp(taskName, now, time, _minDeadZone);
     } else if (type == Types::MDHM) {
         DateTime time = DateTime(now.year(), _time.month(), _time.day(),
                                  _time.hour(), _time.minute(), 0, 0, now.kind());
-        return isTimeUp(taskName, now, time, MinDeadZone);
+        return isTimeUp(taskName, now, time, _minDeadZone);
     }
     return false;
 }
@@ -853,13 +884,23 @@ bool Crontab::isTimeUp() {
 bool Crontab::execute() {
     if (_execution != nullptr) {
         Trace::verb(String::format("Start to execute a task'%s'.", name.c_str()));
-        bool result = _execution->execute();
-        if (!result) {
-            Trace::error(String::format("Can not execute a task'%s'!", name.c_str()));
-        } else {
-            Trace::verb(String::format("Execute a task'%s' successfully.", name.c_str()));
+        Stopwatch sw;
+        Execution::Result result = _execution->execute();
+        sw.stop(false);
+        if (result == Execution::Succeed) {
+            Trace::verb(String::format("Execute a task'%s' successfully, elapsed: %s s.",
+                                       name.c_str(), Double(sw.elapsed().totalSeconds()).toString().c_str()));
+        } else if (result == Execution::FailedToStartProcess) {
+            Trace::error(String::format("Failed to start a process, task'%s'!", name.c_str()));
+        } else if (result == Execution::NotFound) {
+            Trace::error(String::format("The app or script was not found, task'%s'!", name.c_str()));
+        } else if (result == Execution::Timeout) {
+            Trace::error(String::format("The task'%s' execution time out, elapsed: %s s!",
+                                        name.c_str(), Double(sw.elapsed().totalSeconds()).toString().c_str()));
+        } else if (result == Execution::FailedToExecuteSql) {
+            Trace::error(String::format("Failed to execute a sql, task'%s'!", name.c_str()));
         }
-        return result;
+        return result == Execution::Succeed;
     } else {
         Trace::error(String::format("Can not find execution in task'%s'!", name.c_str()));
         return false;
@@ -1007,8 +1048,17 @@ bool Crontab::parse(const YmlNode::Properties &properties, int pos, Crontab &cro
                 String repeatType, repeatValue;
                 properties.at(String::format(SchedulePrefix "repeat.type", pos), repeatType);
                 properties.at(String::format(SchedulePrefix "repeat.value", pos), repeatValue);
+                String second, minute;
+                properties.at(String::format(SchedulePrefix "deadZone.second", pos), second);
+                properties.at(String::format(SchedulePrefix "deadZone.minute", pos), minute);
                 if (TimingSchedule::allRepeatTypes().contains(repeatType, true)) {
-                    crontab._schedule = new TimingSchedule(time, repeatType, repeatValue);
+                    crontab._schedule = new TimingSchedule{
+                            {"time",        time.toString()},
+                            {"repeatType",  repeatType},
+                            {"repeatValue", repeatValue},
+                            {"secDeadZone", second},
+                            {"minDeadZone", minute},
+                    };
                 } else {
                     Trace::error("Repeat type is invalid.");
                 }
@@ -1023,7 +1073,7 @@ bool Crontab::parse(const YmlNode::Properties &properties, int pos, Crontab &cro
             properties.at(String::format(ExecutionPrefix "type", pos), type);
             bool sync = true;
             properties.at(String::format(ExecutionPrefix "sync.enable", pos), sync);
-            TimeSpan timeout = TimeSpan::fromSeconds(10);
+            TimeSpan timeout = TimeSpan::fromSeconds(60);
             properties.at(String::format(ExecutionPrefix "sync.timeout", pos), timeout);
             if (type == "app") {
                 String app, param;
@@ -1158,13 +1208,24 @@ bool Crontab::parseSchedule(const String &str, Schedule *&schedule) {
             JsonNode repeatNode = scheduleNode["repeat"];
             repeatNode.getAttribute("type", repeatType);
             repeatNode.getAttribute("value", repeatValue);
-            if (!TimingSchedule::allRepeatTypes().contains(repeatType, true)) {
-                // Repeat type is invalid.
+            JsonNode deadZoneNode = scheduleNode["deadZone"];
+            String second, minute;
+            repeatNode.getAttribute("second", second);
+            repeatNode.getAttribute("minute", minute);
+            if (TimingSchedule::allRepeatTypes().contains(repeatType, true)) {
+                schedule = new TimingSchedule{
+                        {"time",        time.toString()},
+                        {"repeatType",  repeatType},
+                        {"repeatValue", repeatValue},
+                        {"secDeadZone", second},
+                        {"minDeadZone", minute},
+                };
+                return true;
+            } else {
+                Trace::error("Repeat type is invalid.");
             }
-            schedule = new TimingSchedule(time, repeatType, repeatValue);
-            return true;
         } else {
-            // Can not find schedule type.
+            Trace::error(String::format("Can not find schedule type'%s'!", type.c_str()));
         }
     }
     return false;

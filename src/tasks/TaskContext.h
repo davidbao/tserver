@@ -15,6 +15,7 @@
 #include "database/DataTable.h"
 #include "database/SqlSelectFilter.h"
 #include "system/ServiceFactory.h"
+#include "data/Dictionary.h"
 #include "../Style.h"
 #include <cassert>
 
@@ -38,6 +39,14 @@ using namespace System;
 
 class Execution : public IEvaluation<Execution>, public IEquatable<Execution>, public ICloneable<Execution> {
 public:
+    enum Result {
+        Succeed = 0,
+        FailedToStartProcess,
+        NotFound,
+        Timeout,
+        FailedToExecuteSql,
+    };
+
     Execution();
 
     explicit Execution(bool sync, const TimeSpan &timeout);
@@ -52,7 +61,7 @@ public:
 
     const TimeSpan &timeout() const;
 
-    virtual bool execute() = 0;
+    virtual Result execute() = 0;
 
     virtual JsonNode toJsonNode() const = 0;
 
@@ -92,7 +101,7 @@ public:
 
     const String &param() const;
 
-    bool execute() override;
+    Result execute() override;
 
     JsonNode toJsonNode() const override;
 
@@ -127,7 +136,7 @@ public:
 
     bool isFile() const;
 
-    bool execute() override;
+    Result execute() override;
 
     JsonNode toJsonNode() const override;
 
@@ -167,7 +176,7 @@ public:
 
     bool isFile() const;
 
-    bool execute() override;
+    Result execute() override;
 
     JsonNode toJsonNode() const override;
 
@@ -222,9 +231,9 @@ private:
 
 class TimingSchedule : public Schedule {
 public:
-    TimingSchedule() = default;
+    TimingSchedule();
 
-    TimingSchedule(const DateTime &time, const String &repeatType, const String &repeatValue);
+    TimingSchedule(std::initializer_list<KeyValuePair<String, String>> list);
 
     ~TimingSchedule() override = default;
 
@@ -259,12 +268,12 @@ private:
 
     bool isTimeUp(const String &taskName, Types type);
 
-    static bool isTimeUp(const String &taskName, const DateTime &now, const DateTime &time, const TimeSpan &deadZone);
-
 public:
     static StringArray allRepeatTypes();
 
 private:
+    static bool isTimeUp(const String &taskName, const DateTime &now, const DateTime &time, const TimeSpan &deadZone);
+
     static bool parseWeeks(const String &value, Vector<DayOfWeek> &weeks);
 
     static bool parseMonths(const String &value, Vector<int> &months);
@@ -278,9 +287,8 @@ private:
     String _repeatType;
     String _repeatValue;
 
-private:
-    static const TimeSpan MinDeadZone;
-    static const TimeSpan SecDeadZone;
+    TimeSpan _minDeadZone;
+    TimeSpan _secDeadZone;
 };
 
 class Crontab : public IEvaluation<Crontab>, public IEquatable<Crontab> {
@@ -322,7 +330,7 @@ public:
 
     void updateYmlProperties(YmlNode::Properties &properties, int pos) const;
 
-    static void removeYmlProperties(YmlNode::Properties &properties, int pos) ;
+    static void removeYmlProperties(YmlNode::Properties &properties, int pos);
 
     String toInsertSqlStr(const String &prefix) const;
 

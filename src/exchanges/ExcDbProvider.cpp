@@ -21,6 +21,14 @@ using namespace Microservice;
 
 ExcDbProvider::ExcDbProvider() {
     Trace::info("The exchange type is database.");
+
+    ServiceFactory *factory = ServiceFactory::instance();
+    assert(factory);
+    auto *cs = factory->getService<IConfigService>();
+    assert(cs);
+
+    _logSqlInfo = false;
+    cs->getProperty(LogPrefix "sqlEnable", _logSqlInfo);
 }
 
 ExcDbProvider::~ExcDbProvider() = default;
@@ -56,9 +64,9 @@ FetchResult ExcDbProvider::getLabelValues(const String &labelName, const StringA
 //        sql = String::format("SELECT %s FROM %s limit 1", tagNames.toString(',').c_str(), name.c_str());
     }
 
-#ifdef DEBUG
-    createSqlFile("getLabelValues.sql", sql);
-#endif
+    if (_logSqlInfo) {
+        createSqlFile(String::format("getLabelValues.%s.sql", labelName.c_str()), sql);
+    }
 
     DataTable table;
     if (connection->executeSqlQuery(sql, table)) {
@@ -113,9 +121,9 @@ FetchResult ExcDbProvider::getTableValues(const String &tableName, const StringA
         sql = filter.toSelectSql(name, colNames.toString(','));
     }
 
-#ifdef DEBUG
-    createSqlFile("getTableValues.sql", sql);
-#endif
+    if (_logSqlInfo) {
+        createSqlFile(String::format("getTableValues.%s.sql", tableName.c_str()), sql);
+    }
 
     if (connection->executeSqlQuery(sql, table)) {
         sql = getSql(tableName, 2);
@@ -123,9 +131,10 @@ FetchResult ExcDbProvider::getTableValues(const String &tableName, const StringA
             sql = filter.toCountSql(name);
         }
 
-#ifdef DEBUG
-        createSqlFile("getTableCount.sql", sql);
-#endif
+        if (_logSqlInfo) {
+            createSqlFile(String::format("getTableCount.%s.sql", tableName.c_str()), sql);
+        }
+
         int totalCount = 0;
         if (connection->retrieveCount(sql, totalCount))
             table.setTotalCount(totalCount);
