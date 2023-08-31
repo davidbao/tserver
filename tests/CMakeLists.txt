@@ -113,6 +113,8 @@ if (TSERVER_ENABLE_TEST)
 
     set(TSERVER_SRC ../src/Style.cpp)
     set(TEST_SRC StyleTest.cpp)
+    set(TSERVER_SRC ${TSERVER_SRC} ../src/tasks/Schedule.cpp)
+    set(TEST_SRC ${TEST_SRC} ScheduleTest.cpp)
 
     foreach (item ${TEST_SRC})
         string(REGEX MATCH "[0-9A-Za-z_]*" app ${item})

@@ -19,6 +19,7 @@
 #include "tasks/TaskContext.h"
 #include "tasks/TaskStorage.h"
 #include "tasks/TaskCache.h"
+#include "tasks/Execution.h"
 
 using namespace IO;
 using namespace Config;

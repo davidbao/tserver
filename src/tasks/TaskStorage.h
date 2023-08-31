@@ -33,10 +33,16 @@ public:
     bool removeTask(const StringMap &request, StringMap &response) override;
 
 private:
-    static bool saveFile(const YmlNode::Properties &properties);
+    String fileName() const;
+
+    void rescan();
+
+    bool saveFile(const YmlNode::Properties &properties);
 
 private:
     YmlNode::Properties _properties;
+
+    DateTime _modifyTime;
 };
 
 class TaskDatabase : public ITaskStorage {

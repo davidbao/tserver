@@ -124,8 +124,10 @@ set(EXCHANGE_SRC exchanges/ExcContext.cpp
         exchanges/ExcSimContext.cpp
         exchanges/ExcSimStorage.cpp
         exchanges/ExcSimProvider.cpp)
-set(TASK_SRC tasks/TaskCache.cpp
-        tasks/TaskContext.cpp
+set(TASK_SRC tasks/Crontab.cpp
+        tasks/Execution.cpp
+        tasks/Schedule.cpp
+        tasks/TaskCache.cpp
         tasks/TaskDbService.cpp
         tasks/TaskStorage.cpp
         tasks/TimerService.cpp)

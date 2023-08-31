@@ -8,8 +8,10 @@
 
 #include "TaskStorage.h"
 #include "IO/Path.h"
+#include "IO/File.h"
 #include "system/Math.h"
 #include "system/Application.h"
+#include "system/Environment.h"
 #include "configuration/ConfigService.h"
 #include "microservice/DataSourceService.h"
 #include "../HttpErrorCode.h"
@@ -20,6 +22,36 @@ using namespace Microservice;
 
 bool TaskFile::load() {
     // load yml file.
+    String fileName = this->fileName();
+    Locker locker(&_properties);
+    if (YmlNode::loadFile(fileName, _properties)) {
+        File::getModifyTime(fileName, _modifyTime);
+        return true;
+    }
+    return false;
+}
+
+void TaskFile::rescan() {
+    static uint64_t tick = Environment::getTickCount();
+    if (Environment::getTickCount() - tick >= 30 * 1000) {
+        String fileName = this->fileName();
+
+        DateTime modifyTime;
+        File::getModifyTime(fileName, modifyTime);
+        if (_modifyTime != modifyTime) {
+            // reload.
+            Trace::info(String::format("The file'%s' is changed, so reload it.",
+                                       Path::getFileName(fileName).c_str()));
+            YmlNode::Properties properties;
+            if (YmlNode::loadFile(fileName, properties)) {
+                _properties = properties;
+                File::getModifyTime(fileName, _modifyTime);
+            }
+        }
+    }
+}
+
+String TaskFile::fileName() const {
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
     auto *cs = factory->getService<IConfigService>();
@@ -28,11 +60,12 @@ bool TaskFile::load() {
     String path = Application::instance()->rootPath();
     String name = cs->getProperty(TaskPrefix "file.name");
     String fileName = Path::combine(path, String::format("%s.yml", name.c_str()));
-    Locker locker(&_properties);
-    return YmlNode::loadFile(fileName, _properties);
+    return fileName;
 }
 
 bool TaskFile::getTask(const String &name, Crontab &crontab) {
+    rescan();
+
     Locker locker(&_properties);
     for (int i = 0; i < MaxTaskCount; i++) {
         Crontab task;
@@ -48,11 +81,15 @@ bool TaskFile::getTask(const String &name, Crontab &crontab) {
 }
 
 bool TaskFile::getTask(int pos, Crontab &crontab) {
+    rescan();
+
     Locker locker(&_properties);
     return Crontab::parse(_properties, pos, crontab);
 }
 
 bool TaskFile::getTasks(const SqlSelectFilter &filter, DataTable &table) {
+    rescan();
+
     Locker locker(&_properties);
 //    const YmlNode::Properties &props = _properties;
 //    for (auto it = props.begin(); it != props.end(); ++it) {
@@ -195,15 +232,12 @@ bool TaskFile::removeTask(const StringMap &request, StringMap &response) {
 }
 
 bool TaskFile::saveFile(const YmlNode::Properties &properties) {
-    ServiceFactory *factory = ServiceFactory::instance();
-    assert(factory);
-    auto *cs = factory->getService<IConfigService>();
-    assert(cs);
-
-    String path = Application::instance()->rootPath();
-    String name = cs->getProperty(TaskPrefix "file.name");
-    String fileName = Path::combine(path, String::format("%s.yml", name.c_str()));
-    return YmlNode::saveFile(fileName, properties);
+    String fileName = this->fileName();
+    if (YmlNode::saveFile(fileName, properties)) {
+        File::getModifyTime(fileName, _modifyTime);
+        return true;
+    }
+    return true;
 }
 
 TaskDatabase::TaskDatabase() : _connection(nullptr) {

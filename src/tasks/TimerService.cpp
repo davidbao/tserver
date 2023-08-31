@@ -20,7 +20,7 @@ bool TimerService::initialize(ITaskStorage *storage) {
     _storage = storage;
 
     if (_timer == nullptr) {
-        static const TimeSpan interval = TimeSpan::fromMilliseconds(100);
+        static const TimeSpan interval = TimeSpan::fromMilliseconds(500);
         _timer = new Timer("task.timer", interval, interval, &TimerService::taskTimeUp, this);
     }
     return true;

@@ -8,8 +8,10 @@
 
 #include "ExcSimStorage.h"
 #include "IO/Path.h"
+#include "IO/File.h"
 #include "system/Math.h"
 #include "system/Application.h"
+#include "system/Environment.h"
 #include "configuration/ConfigService.h"
 #include "microservice/DataSourceService.h"
 #include "../HttpErrorCode.h"
@@ -20,6 +22,36 @@ using namespace Microservice;
 
 bool ExcSimFile::load() {
     // load yml file.
+    String fileName = this->fileName();
+    Locker locker(&_properties);
+    if (YmlNode::loadFile(fileName, _properties)) {
+        File::getModifyTime(fileName, _modifyTime);
+        return true;
+    }
+    return false;
+}
+
+void ExcSimFile::rescan() {
+    static uint64_t tick = Environment::getTickCount();
+    if (Environment::getTickCount() - tick >= 30 * 1000) {
+        String fileName = this->fileName();
+
+        DateTime modifyTime;
+        File::getModifyTime(fileName, modifyTime);
+        if (_modifyTime != modifyTime) {
+            // reload.
+            Trace::info(String::format("The file'%s' is changed, so reload it.",
+                                       Path::getFileName(fileName).c_str()));
+            YmlNode::Properties properties;
+            if (YmlNode::loadFile(fileName, properties)) {
+                _properties = properties;
+                File::getModifyTime(fileName, _modifyTime);
+            }
+        }
+    }
+}
+
+String ExcSimFile::fileName() const {
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
     auto *cs = factory->getService<IConfigService>();
@@ -28,18 +60,12 @@ bool ExcSimFile::load() {
     String path = Application::instance()->rootPath();
     String name = cs->getProperty(SimulatorPrefix "file.name");
     String fileName = Path::combine(path, String::format("%s.yml", name.c_str()));
-    Locker locker(&_properties);
-    auto result = YmlNode::loadFile(fileName, _properties);
-//    const YmlNode::Properties &props = _properties;
-//    for (auto it = props.begin(); it != props.end(); ++it) {
-//        const String &key = it.key();
-//        const String &value = it.value();
-//        Trace::info(String::format("%s=%s", key.c_str(), value.c_str()));
-//    }
-    return result;
+    return fileName;
 }
 
 bool ExcSimFile::getLabel(const String &name, Label &label) {
+    rescan();
+
     Locker locker(&_properties);
     for (int i = 0; i < MaxLabelCount; i++) {
         Label element;
@@ -55,6 +81,8 @@ bool ExcSimFile::getLabel(const String &name, Label &label) {
 }
 
 bool ExcSimFile::getLabels(const SqlSelectFilter &filter, DataTable &table) {
+    rescan();
+
     Locker locker(&_properties);
 //    const YmlNode::Properties &props = _properties;
 //    for (auto it = props.begin(); it != props.end(); ++it) {
@@ -349,15 +377,12 @@ bool ExcSimFile::removeTable(const StringMap &request, StringMap &response) {
 }
 
 bool ExcSimFile::saveFile(const YmlNode::Properties &properties) {
-    ServiceFactory *factory = ServiceFactory::instance();
-    assert(factory);
-    auto *cs = factory->getService<IConfigService>();
-    assert(cs);
-
-    String path = Application::instance()->rootPath();
-    String name = cs->getProperty(SimulatorPrefix "file.name");
-    String fileName = Path::combine(path, String::format("%s.yml", name.c_str()));
-    return YmlNode::saveFile(fileName, properties);
+    String fileName = this->fileName();
+    if (YmlNode::saveFile(fileName, properties)) {
+        File::getModifyTime(fileName, _modifyTime);
+        return true;
+    }
+    return false;
 }
 
 ExcSimDatabase::ExcSimDatabase() : _connection(nullptr) {
