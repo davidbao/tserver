@@ -199,6 +199,8 @@ bool CronSchedule::parse(const String &str, CronSchedule &schedule) {
         return false;
     }
 
+    // https://crontab.guru/ and https://tool.lu/crontab/
+
     //   *    *    *    *    *
     //   -    -    -    -    -
     //   |    |    |    |    |
