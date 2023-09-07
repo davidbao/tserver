@@ -55,6 +55,10 @@ private:
     TimerService _timerService;
 
     TaskDbService _dbService;
+
+#ifndef WIN32
+    Timer *_cleanTimer;
+#endif
 };
 
 

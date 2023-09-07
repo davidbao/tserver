@@ -256,9 +256,9 @@ bool TaskDatabase::load() {
     auto *cs = factory->getService<IConfigService>();
     assert(cs);
 
-    String userName = cs->getProperty(SimDbPrefix "username");
-    String password = cs->getProperty(SimDbPrefix "password");
-    String urlStr = cs->getProperty(SimDbPrefix "url");
+    String userName = cs->getProperty(TaskDbPrefix "username");
+    String password = cs->getProperty(TaskDbPrefix "password");
+    String urlStr = cs->getProperty(TaskDbPrefix "url");
     _connection = new SqlConnection(urlStr, userName, password);
     return _connection->open();
 }
@@ -420,7 +420,7 @@ String TaskDatabase::getTablePrefix() {
     assert(cs);
 
     String prefix;
-    cs->getProperty(SimDbPrefix "table.prefix", prefix);
+    cs->getProperty(TaskDbPrefix "table.prefix", prefix);
     return prefix;
 }
 

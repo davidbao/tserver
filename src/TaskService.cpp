@@ -11,7 +11,6 @@
 #include "IO/Path.h"
 #include "IO/File.h"
 #include "IO/Directory.h"
-#include "system/Math.h"
 #include "crypto/Md5Provider.h"
 #include "IO/Zip.h"
 #include "TaskService.h"
@@ -20,6 +19,7 @@
 #include "tasks/TaskStorage.h"
 #include "tasks/TaskCache.h"
 #include "tasks/Execution.h"
+#include <sys/wait.h>
 
 using namespace IO;
 using namespace Config;
@@ -30,11 +30,27 @@ TaskService::TaskService() : _storage(nullptr), _cache(nullptr) {
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
     factory->addService<TaskService>(this);
+
+#ifndef WIN32
+    auto cleanDefunctFunc = []() {
+        int status;
+        pid_t pid = wait(&status);
+        if (pid > 0 && WIFEXITED(status)) {
+            Trace::verb(String::format("process %d exited, return value = %d", pid, WEXITSTATUS(status)));
+        }
+    };
+    _cleanTimer = new Timer("clean.defunct.process", 30 * 1000, cleanDefunctFunc);
+#endif
 }
 
 TaskService::~TaskService() {
     delete _storage;
     _storage = nullptr;
+
+#ifndef WIN32
+    delete _cleanTimer;
+    _cleanTimer = nullptr;
+#endif
 
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);

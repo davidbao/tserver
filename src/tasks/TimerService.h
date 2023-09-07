@@ -26,10 +26,13 @@ public:
     bool unInitialize();
 
 private:
-    void taskTimeUp();
+    void cycleTimeUp();
+
+    void cronTimeUp();
 
 private:
-    Timer *_timer;
+    Timer *_cycleTimer;
+    Timer *_cronTimer;
 
     ITaskStorage *_storage;
 };

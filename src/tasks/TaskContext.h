@@ -13,7 +13,7 @@
 
 // for application.yml
 #define TaskPrefix "summer.task."
-#define SimDbPrefix TaskPrefix "database."
+#define TaskDbPrefix TaskPrefix "database."
 
 // for yml file.
 #define MaxTaskCount 1000
