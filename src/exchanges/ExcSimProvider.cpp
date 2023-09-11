@@ -60,7 +60,7 @@ FetchResult ExcSimProvider::getLabelValues(const String &labelName, const String
 
             for (size_t i = 0; i < tags.count(); i++) {
                 const Tag &tag = tags[i];
-                values.add(tag.name, tag.getValue(&label, filter));
+                values.add(tag.name, tag.getValue(&label, filter.values()));
             }
             return FetchResult::Succeed;
         } else {
@@ -149,6 +149,25 @@ FetchResult ExcSimProvider::getTableValues(const String &tableName, const String
         } else {
             Trace::error(String::format("Can not find a table, name: %s", tableName.c_str()));
             return FetchResult ::TableNotFound;
+        }
+    }
+
+    Trace::error("Can not find simulator config!");
+    return FetchResult::ConfigError;
+}
+
+FetchResult ExcSimProvider::execButton(const String &buttonName, const StringMap &params, VariantMap &results) {
+    if (_storage != nullptr) {
+        Button button;
+        if (_storage->getButton(buttonName, button)) {
+            for (size_t i = 0; i < button.results.count(); i++) {
+                const Result &result = button.results[i];
+                results.add(result.name, result.getValue(&button, params));
+            }
+            return FetchResult::Succeed;
+        } else {
+            Trace::error(String::format("Can not find a button, name: %s", buttonName.c_str()));
+            return FetchResult::LabelNotFound;
         }
     }
 
@@ -257,6 +276,50 @@ bool ExcSimProvider::removeTable(const StringMap &request, StringMap &response) 
 bool ExcSimProvider::updateTable(const StringMap &request, StringMap &response) {
     if (_storage != nullptr) {
         return _storage->updateTable(request, response);
+    }
+    response.addRange(HttpCode::at(CannotFindSimType));
+    return false;
+}
+
+bool ExcSimProvider::getButtons(const SqlSelectFilter &filter, DataTable &table) {
+    return _storage != nullptr && _storage->getButtons(filter, table);
+}
+
+bool ExcSimProvider::getButton(const StringMap &request, StringMap &response) {
+    if (_storage != nullptr) {
+        Button label;
+        String name = request["name"];
+        if (_storage->getButton(name, label)) {
+            response["code"] = "0";
+            response["data"] = label.toJsonNode().toString();
+            return true;
+        }
+        response.addRange(HttpCode::at(CannotFindButton));
+        return false;
+    }
+    response.addRange(HttpCode::at(CannotFindSimType));
+    return false;
+}
+
+bool ExcSimProvider::addButton(const StringMap &request, StringMap &response) {
+    if (_storage != nullptr) {
+        return _storage->addButton(request, response);
+    }
+    response.addRange(HttpCode::at(CannotFindSimType));
+    return false;
+}
+
+bool ExcSimProvider::removeButton(const StringMap &request, StringMap &response) {
+    if (_storage != nullptr) {
+        return _storage->removeButton(request, response);
+    }
+    response.addRange(HttpCode::at(CannotFindSimType));
+    return false;
+}
+
+bool ExcSimProvider::updateButton(const StringMap &request, StringMap &response) {
+    if (_storage != nullptr) {
+        return _storage->updateButton(request, response);
     }
     response.addRange(HttpCode::at(CannotFindSimType));
     return false;

@@ -15,8 +15,8 @@ using namespace Diag;
 Crontab::Crontab() : name(String::Empty), enable(true), _schedule(nullptr), _execution(nullptr) {
 }
 
-Crontab::Crontab(const String &name, Schedule *schedule, Execution *execution) :
-        name(name), enable(true), _schedule(schedule), _execution(execution) {
+Crontab::Crontab(const String &name, Schedule *schedule, Execution *execution, const StringArray &resultNames) :
+        name(name), enable(true), _schedule(schedule), _execution(execution), resultNames(resultNames) {
 }
 
 Crontab::Crontab(const Crontab &other) : enable(true), _schedule(nullptr), _execution(nullptr) {
@@ -52,22 +52,31 @@ bool Crontab::equals(const Crontab &other) const {
     } else if (_execution == nullptr && other._execution != nullptr) {
         return false;
     }
+
+    if (resultNames != other.resultNames) {
+        return false;
+    }
+
     return true;
 }
 
 void Crontab::evaluates(const Crontab &other) {
     name = other.name;
     enable = other.enable;
+
     delete _schedule;
     _schedule = nullptr;
     if (other._schedule != nullptr) {
         _schedule = other._schedule->clone();
     }
+
     delete _execution;
     _execution = nullptr;
     if (other._execution != nullptr) {
         _execution = other._execution->clone();
     }
+
+    resultNames = other.resultNames;
 }
 
 Crontab &Crontab::operator=(const Crontab &other) {
@@ -121,6 +130,7 @@ DataRow Crontab::toDataRow(const DataTable &table) const {
                                DataCell(table.columns()["name"], name),
                                DataCell(table.columns()["schedule"], _schedule->toJsonNode().toString()),
                                DataCell(table.columns()["execution"], _execution->toJsonNode().toString()),
+                               DataCell(table.columns()["result"], resultNames.toString()),
                        });
     } else {
         return DataRow({
@@ -138,6 +148,10 @@ JsonNode Crontab::toJsonNode() const {
     if (_execution != nullptr) {
         node.add(JsonNode("execution", _execution->toJsonNode()));
     }
+    if (hasResult()) {
+        JsonNode rNode("names", resultNames);
+        node.add(JsonNode("result", rNode));
+    }
     return node;
 }
 
@@ -149,6 +163,10 @@ void Crontab::removeFile() {
 
 bool Crontab::isValid() const {
     return _schedule != nullptr && _execution != nullptr;
+}
+
+bool Crontab::hasResult() const {
+    return resultNames.count() > 0;
 }
 
 bool Crontab::findName(const String &n) const {
@@ -211,6 +229,8 @@ void Crontab::removeYmlProperties(YmlNode::Properties &properties, int pos) {
             removeKeys.add(k);
         } else if (k.find(String::format(TasksPrefix "execution", pos)) >= 0) {
             removeKeys.add(k);
+        } else if (k.find(String::format(TasksPrefix "result", pos)) >= 0) {
+            removeKeys.add(k);
         }
     }
     for (int i = 0; i < removeKeys.count(); ++i) {
@@ -222,12 +242,12 @@ bool Crontab::parse(const StringMap &request, Crontab &crontab) {
     if (!request.at("name", crontab.name)) {
         return false;
     }
-    if (!parseSchedule(request["schedule"], crontab._schedule)) {
-        return false;
-    }
+    parseSchedule(request["schedule"], crontab._schedule);
     if (!parseExecution(request["execution"], crontab._execution)) {
         return false;
     }
+    parseResult(request["result"], crontab.resultNames);
+
     return true;
 }
 
@@ -258,7 +278,7 @@ bool Crontab::parse(const YmlNode::Properties &properties, int pos, Crontab &cro
                     Trace::error(String::format("Task'%s' cron field is invalid.", name.c_str()));
                 }
             } else {
-                Trace::error(String::format("Can not find schedule type'%s'!", type.c_str()));
+//                Trace::error(String::format("Can not find schedule type'%s'!", type.c_str()));
             }
         }
 
@@ -294,21 +314,33 @@ bool Crontab::parse(const YmlNode::Properties &properties, int pos, Crontab &cro
                 Trace::error(String::format("Can not find the execution type'%s'!", type.c_str()));
             }
         }
+
+        // result
+        {
+            String result;
+            properties.at(String::format(TasksPrefix "result.name", pos), result);
+            StringArray resultNames;
+            StringArray::parse(result, resultNames, ',');
+            for (size_t i = 0; i < resultNames.count(); ++i) {
+                crontab.resultNames.add(resultNames[0].trim());
+            }
+        }
+
         return true;
     }
     return false;
 }
 
-bool Crontab::parse(const DataRow &row, Crontab &label) {
-    if (!row["name"].value().getValue(label.name)) {
+bool Crontab::parse(const DataRow &row, Crontab &crontab) {
+    if (!row["name"].value().getValue(crontab.name)) {
         return false;
     }
-    if (!parseSchedule(row["schedule"].valueStr(), label._schedule)) {
+    parseSchedule(row["schedule"].valueStr(), crontab._schedule);
+    if (!parseExecution(row["execution"].valueStr(), crontab._execution)) {
         return false;
     }
-    if (!parseExecution(row["execution"].valueStr(), label._execution)) {
-        return false;
-    }
+    parseResult(row["result"].valueStr(), crontab.resultNames);
+
     return true;
 }
 
@@ -449,6 +481,15 @@ bool Crontab::parseExecution(const String &str, Execution *&execution) {
         }
     }
     return false;
+}
+
+bool Crontab::parseResult(const String &str, StringArray &results) {
+    StringArray resultNames;
+    StringArray::parse(str, resultNames, ',');
+    for (size_t i = 0; i < resultNames.count(); ++i) {
+        results.add(resultNames[0].trim());
+    }
+    return results.count() > 0;
 }
 
 String Crontab::getTableName(const String &prefix, const String &tableName) {

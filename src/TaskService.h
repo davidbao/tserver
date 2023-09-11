@@ -31,6 +31,8 @@ public:
 
     bool unInitialize();
 
+    ITaskStorage *storage() const;
+
     // for HTTP.
     bool getTasks(const SqlSelectFilter &filter, DataTable &table);
 

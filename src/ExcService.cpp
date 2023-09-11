@@ -204,6 +204,61 @@ FetchResult ExcService::getTableValues(const JsonNode &request, JsonNode &respon
     return FetchResult::NodeNotFound;
 }
 
+FetchResult ExcService::execButton(const JsonNode &request, JsonNode &response) {
+    IExcProvider *provider = this->provider();
+    if (provider == nullptr) {
+        return FetchResult::ConfigError;
+    }
+
+    ServiceFactory *factory = ServiceFactory::instance();
+    assert(factory);
+    auto *cs = factory->getService<IConfigService>();
+    assert(cs);
+
+    String responseStyle;
+    cs->getProperty(ExcPrefix "response.style", responseStyle);
+
+    if (request.name() == "button") {
+        List<JsonNode> nodes;
+        request.subNodes(nodes);
+        if (nodes.count() > 0) {
+            JsonNode bNode("button", JsonNode::TypeArray);
+            for (size_t i = 0; i < nodes.count(); ++i) {
+                const JsonNode &node = nodes[i];
+                String name = node.getAttribute("name");
+                StringMap params(true);
+                node["parameters"].getAttribute(params);
+                VariantMap values;
+                FetchResult result = provider->execButton(name, params, values);
+                JsonNode iNode("item");
+                iNode.add(JsonNode("name", name));
+                iNode.add(JsonNode("errorCode", (int) result));
+                if (result == FetchResult::Succeed) {
+                    JsonNode resultsNode("results");
+                    for (auto it = values.begin(); it != values.end(); ++it) {
+                        auto resultName = it.key();
+                        auto resultValue = it.value();
+                        if (responseStyle == "string") {
+                            resultsNode.add(JsonNode(resultName, resultValue.toString()));
+                        } else {
+                            resultsNode.add(JsonNode(resultName, resultValue));
+                        }
+                    }
+                    iNode.add(resultsNode);
+                }
+                bNode.add(iNode);
+            }
+            response = bNode;
+
+            return FetchResult::Succeed;
+        } else {
+            // Without buttons.
+            return FetchResult::NodeNotFound;
+        }
+    }
+    return FetchResult::NodeNotFound;
+}
+
 bool ExcService::getType(const StringMap &request, StringMap &response) {
     String type = this->type();
     if (!type.isNullOrEmpty()) {
@@ -342,6 +397,51 @@ bool ExcService::updateTable(const StringMap &request, StringMap &response) {
     auto esp = dynamic_cast<ExcSimProvider *>(_provider);
     if (esp != nullptr) {
         return esp->updateTable(request, response);
+    }
+    response.addRange(HttpCode::at(ExchangeTypeNotSimulator));
+    return false;
+}
+
+// Buttons
+bool ExcService::getButtons(const SqlSelectFilter &filter, DataTable &table) {
+    auto esp = dynamic_cast<ExcSimProvider *>(_provider);
+    if (esp != nullptr) {
+        return esp->getButtons(filter, table);
+    }
+    return false;
+}
+
+bool ExcService::getButton(const StringMap &request, StringMap &response) {
+    auto esp = dynamic_cast<ExcSimProvider *>(_provider);
+    if (esp != nullptr) {
+        return esp->getButton(request, response);
+    }
+    response.addRange(HttpCode::at(ExchangeTypeNotSimulator));
+    return false;
+}
+
+bool ExcService::addButton(const StringMap &request, StringMap &response) {
+    auto esp = dynamic_cast<ExcSimProvider *>(_provider);
+    if (esp != nullptr) {
+        return esp->addButton(request, response);
+    }
+    response.addRange(HttpCode::at(ExchangeTypeNotSimulator));
+    return false;
+}
+
+bool ExcService::removeButton(const StringMap &request, StringMap &response) {
+    auto esp = dynamic_cast<ExcSimProvider *>(_provider);
+    if (esp != nullptr) {
+        return esp->removeButton(request, response);
+    }
+    response.addRange(HttpCode::at(ExchangeTypeNotSimulator));
+    return false;
+}
+
+bool ExcService::updateButton(const StringMap &request, StringMap &response) {
+    auto esp = dynamic_cast<ExcSimProvider *>(_provider);
+    if (esp != nullptr) {
+        return esp->updateButton(request, response);
     }
     response.addRange(HttpCode::at(ExchangeTypeNotSimulator));
     return false;

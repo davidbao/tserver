@@ -38,12 +38,20 @@ using namespace System;
 #define MaxRowCount 1000
 #define RowPrefix TablePrefix "rows[%d]."
 
+#define MaxButtonCount 1000
+#define ButtonPrefix "buttons[%d]."
+#define MaxResultCount 1000
+#define ResultPrefix ButtonPrefix "results[%d]."
+
 // for database.
 #define LabelTableName "sim_label"
 #define TagTableName "sim_tag"
 
 #define TableTableName "sim_table"
 #define ColumnTableName "sim_column"
+
+#define ButtonTableName "sim_button"
+#define ResultTableName "sim_result"
 
 class Element;
 
@@ -106,8 +114,6 @@ public:
     static bool parseRange(const String &str, double &minValue, double &maxValue);
 };
 
-typedef PList<Element> Elements;
-
 class Label;
 
 class Tag : public Item, public IEvaluation<Tag>, public IEquatable<Tag> {
@@ -122,7 +128,7 @@ public:
 
     void evaluates(const Tag &other) override;
 
-    Variant getValue(const Label *label, const SqlSelectFilter &filter) const;
+    Variant getValue(const Element *element, const StringMap &filter) const;
 
     DbType type() const;
 };
@@ -231,9 +237,9 @@ class Row : public IEvaluation<Row>, public IEquatable<Row> {
 public:
     Row() = default;
 
-    Row(const String &rowStr);
+    explicit Row(const String &rowStr);
 
-    Row(const StringArray &cells);
+    explicit Row(const StringArray &cells);
 
     Row(const Row &row);
 
@@ -318,6 +324,68 @@ private:
 
 typedef List<Table> Tables;
 
+typedef Tag Result;
+typedef Tags Results;
+
+class Button : public Element, public IEvaluation<Button>, public IEquatable<Button> {
+public:
+    using Element::findItemName;
+
+    Results results;
+
+    Button() = default;
+
+    explicit Button(const String &name, double minValue, double maxValue, double step);
+
+    Button(const Button &other);
+
+    DataRow toDataRow(const DataTable &table) const override;
+
+    String toValuesStr() const override;
+
+    bool findItemName(const StringArray &itemNames) const override;
+
+    JsonNode toJsonNode() const override;
+
+    bool equals(const Button &other) const override;
+
+    void evaluates(const Button &other) override;
+
+    void updateYmlProperties(YmlNode::Properties &properties, int pos) const;
+
+    void removeYmlProperties(YmlNode::Properties &properties, int pos) const;
+
+    String toInsertSqlStr(const String &prefix) const;
+
+    String toReplaceSqlStr(const String &prefix) const;
+
+    bool getResults(const StringArray &resultNames, Results &values) const;
+
+public:
+    static bool parse(const StringMap &request, Button &button);
+
+    static bool parse(const YmlNode::Properties &properties, int pos, Button &button);
+
+    static bool parse(const DataRow &buttonRow, const DataRows &resultRows, Button &button);
+
+    static bool parse(const DataRow &row, Button &button);
+
+    static String toSelectSqlStr(const String &prefix, const String &name);
+
+    static String toSelectSqlStr(const String &prefix, const SqlSelectFilter &filter);
+
+    static String toCountSqlStr(const String &prefix, const SqlSelectFilter &filter);
+
+    static String toDeleteSqlStr(const String &prefix, const String &buttonName);
+
+private:
+    static bool parseResults(const String &str, Results &results);
+
+    static String getTableName(const String &prefix, const String &tableName);
+};
+
+typedef List<Button> Buttons;
+
 class IExcSimCache : public IService {
 public:
     IExcSimCache() = default;
@@ -356,6 +424,17 @@ public:
     virtual bool updateTable(const StringMap &request, StringMap &response) = 0;
 
     virtual bool removeTable(const StringMap &request, StringMap &response) = 0;
+
+    // button
+    virtual bool getButton(const String &name, Button &Button) = 0;
+
+    virtual bool getButtons(const SqlSelectFilter &filter, DataTable &table) = 0;
+
+    virtual bool addButton(const StringMap &request, StringMap &response) = 0;
+
+    virtual bool updateButton(const StringMap &request, StringMap &response) = 0;
+
+    virtual bool removeButton(const StringMap &request, StringMap &response) = 0;
 };
 
 #endif //TSERVER_EXCSIMCONTEXT_H

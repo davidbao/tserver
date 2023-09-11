@@ -42,6 +42,17 @@ public:
 
     bool removeTable(const StringMap &request, StringMap &response) override;
 
+    // button
+    bool getButton(const String &name, Button &button) override;
+
+    bool getButtons(const SqlSelectFilter &filter, DataTable &table) override;
+
+    bool addButton(const StringMap &request, StringMap &response) override;
+
+    bool updateButton(const StringMap &request, StringMap &response) override;
+
+    bool removeButton(const StringMap &request, StringMap &response) override;
+
 private:
     String fileName() const;
 
@@ -85,6 +96,17 @@ public:
 
     bool removeTable(const StringMap &request, StringMap &response) override;
 
+    // button
+    bool getButton(const String &name, Button &button) override;
+
+    bool getButtons(const SqlSelectFilter &filter, DataTable &table) override;
+
+    bool addButton(const StringMap &request, StringMap &response) override;
+
+    bool updateButton(const StringMap &request, StringMap &response) override;
+
+    bool removeButton(const StringMap &request, StringMap &response) override;
+
 private:
     bool getLabelId(const String &name, uint64_t &id);
 
@@ -93,6 +115,10 @@ private:
     bool getTableId(const String &name, uint64_t &id);
 
     bool containsTable(const String &name);
+
+    bool getButtonId(const String &name, uint64_t &id);
+
+    bool containsButton(const String &name);
 
 private:
     static String getTablePrefix();

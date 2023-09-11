@@ -77,6 +77,10 @@ bool TaskService::unInitialize() {
     return true;
 }
 
+ITaskStorage *TaskService::storage() const {
+    return _storage;
+}
+
 bool TaskService::loadData() {
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);

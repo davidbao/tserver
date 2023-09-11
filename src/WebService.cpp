@@ -134,7 +134,16 @@ HttpStatus WebService::onExchange(const HttpRequest &request, HttpResponse &resp
             dataNode.add(tableNode);
         }
 
-        if (lResult == FetchResult::NodeNotFound && tResult == FetchResult::NodeNotFound) {
+        // process button node.
+        JsonNode buttonNode;
+        FetchResult bResult = es->execButton(root["button"], buttonNode);
+        if (bResult == FetchResult::Succeed) {
+            dataNode.add(buttonNode);
+        }
+
+        if (lResult == FetchResult::NodeNotFound &&
+            tResult == FetchResult::NodeNotFound &&
+            bResult == FetchResult::NodeNotFound) {
             result.addRange(HttpCode::at(HttpCode::JsonParseError));
         } else {
             result.add(JsonNode("code", (int) HttpCode::Ok));

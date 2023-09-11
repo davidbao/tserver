@@ -46,6 +46,8 @@ public:
 
     virtual FetchResult getTableValues(const String &tableName, const StringArray &colNames,
                                        const SqlSelectFilter &filter, DataTable &table) = 0;
+
+    virtual FetchResult execButton(const String &buttonName, const StringMap &params, VariantMap &results) = 0;
 };
 
 #endif //TSERVER_EXCCONTEXT_H

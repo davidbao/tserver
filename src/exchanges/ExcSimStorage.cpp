@@ -34,6 +34,8 @@ bool ExcSimFile::load() {
 void ExcSimFile::rescan() {
     static uint64_t tick = Environment::getTickCount();
     if (Environment::getTickCount() - tick >= 30 * 1000) {
+        tick = Environment::getTickCount();
+
         String fileName = this->fileName();
 
         DateTime modifyTime;
@@ -376,6 +378,168 @@ bool ExcSimFile::removeTable(const StringMap &request, StringMap &response) {
     return true;
 }
 
+bool ExcSimFile::getButton(const String &name, Button &button) {
+    rescan();
+
+    Locker locker(&_properties);
+    for (int i = 0; i < MaxButtonCount; i++) {
+        Button element;
+        if (!Button::parse(_properties, i, element)) {
+            break;
+        }
+        if (element.enable && name == element.name) {
+            button = element;
+            return true;
+        }
+    }
+    return false;
+}
+
+bool ExcSimFile::getButtons(const SqlSelectFilter &filter, DataTable &table) {
+    rescan();
+
+    Locker locker(&_properties);
+//    const YmlNode::Properties &props = _properties;
+//    for (auto it = props.begin(); it != props.end(); ++it) {
+//        const String &key = it.key();
+//        const String &value = it.value();
+//        Trace::info(String::format("%s=%s", key.c_str(), value.c_str()));
+//    }
+
+    Buttons match;
+    String name = filter.getValue("name");
+    String tags = filter.getValue("tags");
+    for (int i = 0; i < MaxButtonCount; i++) {
+        Button button;
+        if (!Button::parse(_properties, i, button)) {
+            break;
+        }
+        if (button.enable) {
+            if (button.findName(name) && button.findItemName(tags)) {
+                match.add(button);
+            }
+        }
+    }
+
+    table.setName("button");
+    table.setTotalCount((int) match.count());
+    table.addColumns({
+                             DataColumn("name", DbType::Text, true),
+                             DataColumn("range", DbType::Text, false),
+                             DataColumn("step", DbType::Float64, false),
+                             DataColumn("tags", DbType::Text, false)
+                     });
+    size_t offset = Math::max(0, filter.offset());
+    size_t count = Math::min((int) match.count(), filter.offset() + filter.limit());
+    for (size_t i = offset; i < count; ++i) {
+        const Button &button = match[i];
+        table.addRow(button.toDataRow(table));
+    }
+
+    // order by
+    table.sort(filter.orderBy());
+
+    return true;
+}
+
+bool ExcSimFile::addButton(const StringMap &request, StringMap &response) {
+    // parse from http request.
+    Button button;
+    if (!Button::parse(request, button)) {
+        response.addRange(HttpCode::at(FailedToParseButton));
+        return false;
+    }
+
+    // find a button by name.
+    int i;
+    Locker locker(&_properties);
+    for (i = 0; i < MaxButtonCount; i++) {
+        Button element;
+        if (!Button::parse(_properties, i, element)) {
+            break;
+        }
+        if (element.enable && button.name == element.name) {
+            // Duplicate name.
+            response.addRange(HttpCode::at(DuplicateName));
+            return false;
+        }
+    }
+
+    // save yml file.
+    button.updateYmlProperties(_properties, i);
+    if (!saveFile(_properties)) {
+        // Failed to save config file.
+        response.addRange(HttpCode::at(FailedToSave));
+        return false;
+    }
+
+    return true;
+}
+
+bool ExcSimFile::updateButton(const StringMap &request, StringMap &response) {
+    // parse from http request.
+    Button button;
+    if (!Button::parse(request, button)) {
+        response.addRange(HttpCode::at(FailedToParseButton));
+        return false;
+    }
+
+    // find a button by name.
+    int i;
+    bool found = false;
+    Locker locker(&_properties);
+    for (i = 0; i < MaxButtonCount; i++) {
+        Button element;
+        if (!Button::parse(_properties, i, element)) {
+            break;
+        }
+        if (element.enable && button.name == element.name) {
+            found = true;
+            break;
+        }
+    }
+
+    if (!found) {
+        // Can not find button by name.
+        response.addRange(HttpCode::at(CannotFindButton));
+        return false;
+    }
+
+    // save yml file.
+    button.updateYmlProperties(_properties, i);
+    if (!saveFile(_properties)) {
+        // Failed to save config file.
+        response.addRange(HttpCode::at(FailedToSave));
+        return false;
+    }
+
+    return true;
+}
+
+bool ExcSimFile::removeButton(const StringMap &request, StringMap &response) {
+    StringArray names;
+    StringArray::parseJson(request["name"], names);
+
+    for (int i = 0; i < MaxButtonCount; i++) {
+        Button element;
+        if (!Button::parse(_properties, i, element)) {
+            break;
+        }
+        if (element.enable && names.contains(element.name)) {
+            element.removeYmlProperties(_properties, i);
+        }
+    }
+
+    // save yml file.
+    if (!saveFile(_properties)) {
+        // Failed to save config file.
+        response.addRange(HttpCode::at(FailedToSave));
+        return false;
+    }
+
+    return true;
+}
+
 bool ExcSimFile::saveFile(const YmlNode::Properties &properties) {
     String fileName = this->fileName();
     if (YmlNode::saveFile(fileName, properties)) {
@@ -632,6 +796,118 @@ bool ExcSimDatabase::removeTable(const StringMap &request, StringMap &response) 
     return false;
 }
 
+bool ExcSimDatabase::getButton(const String &name, Button &button) {
+    if (_connection->isConnected()) {
+        String sql = Button::toSelectSqlStr(getTablePrefix(), name);
+        DataTable dataTable(ButtonTableName);
+        if (_connection->executeSqlQuery(sql, dataTable) && dataTable.rowCount() == 1) {
+            const DataRow &row = dataTable.rows()[0];
+            return Button::parse(row, button);
+        }
+    }
+    return false;
+}
+
+bool ExcSimDatabase::getButtons(const SqlSelectFilter &filter, DataTable &table) {
+    if (_connection->isConnected()) {
+        String sql;
+        sql = Button::toSelectSqlStr(getTablePrefix(), filter);
+        if (_connection->executeSqlQuery(sql, table)) {
+            sql = Button::toCountSqlStr(getTablePrefix(), filter);
+            int totalCount = 0;
+            if(_connection->retrieveCount(sql, totalCount))
+                table.setTotalCount(totalCount);
+            return true;
+        }
+    }
+    return false;
+}
+
+bool ExcSimDatabase::addButton(const StringMap &request, StringMap &response) {
+    if (_connection->isConnected()) {
+        // parse from http request.
+        Button button;
+        if (!Button::parse(request, button)) {
+            response.addRange(HttpCode::at(FailedToParseTable));
+            return false;
+        }
+
+        // find a button by name.
+        if (containsButton(button.name)) {
+            // Duplicate name.
+            response.addRange(HttpCode::at(DuplicateName));
+            return false;
+        }
+
+        // insert button record.
+        String sql = button.toInsertSqlStr(getTablePrefix());
+        if (!_connection->executeSql(sql)) {
+            // Simulator database error.
+            response.addRange(HttpCode::at(SimulatorDbError));
+            return false;
+        }
+
+        return true;
+    }
+
+    response.addRange(HttpCode::at(SimulatorDbError));
+    return false;
+}
+
+bool ExcSimDatabase::updateButton(const StringMap &request, StringMap &response) {
+    if (_connection->isConnected()) {
+        // parse from http request.
+        Button button;
+        if (!Button::parse(request, button)) {
+            response.addRange(HttpCode::at(FailedToParseTable));
+            return false;
+        }
+
+        // find a button by name.
+        if (!containsButton(button.name)) {
+            // Can not find button by name.
+            response.addRange(HttpCode::at(CannotFindButton));
+            return false;
+        }
+
+        // replace button record.
+        String sql = button.toReplaceSqlStr(getTablePrefix());
+        if (!_connection->executeSql(sql)) {
+            // Simulator database error.
+            response.addRange(HttpCode::at(SimulatorDbError));
+            return false;
+        }
+
+        return true;
+    }
+
+    response.addRange(HttpCode::at(SimulatorDbError));
+    return false;
+}
+
+bool ExcSimDatabase::removeButton(const StringMap &request, StringMap &response) {
+    if (_connection->isConnected()) {
+        StringArray names;
+        StringArray::parseJson(request["name"], names);
+
+        // delete button record.
+        String sql;
+        for (size_t i = 0; i < names.count(); ++i) {
+            sql.appendLine(Button::toDeleteSqlStr(getTablePrefix(), names[i]));
+            if (!_connection->executeSql(sql)) {
+                // Simulator database error.
+                response.addRange(HttpCode::at(SimulatorDbError));
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    response.addRange(HttpCode::at(SimulatorDbError));
+    return false;
+}
+
 bool ExcSimDatabase::getLabelId(const String &name, uint64_t &id) {
     if (_connection->isConnected()) {
         String sql = String::format("SELECT id FROM %s WHERE name='%s'",
@@ -664,6 +940,23 @@ bool ExcSimDatabase::getTableId(const String &name, uint64_t &id) {
 bool ExcSimDatabase::containsTable(const String &name) {
     uint64_t id;
     return getTableId(name, id);
+}
+
+bool ExcSimDatabase::getButtonId(const String &name, uint64_t &id) {
+    if (_connection->isConnected()) {
+        String sql = String::format("SELECT id FROM %s WHERE name='%s'",
+                                    getTableName(ButtonTableName).c_str(), name.c_str());
+        DataTable dataTable(ButtonTableName);
+        if (_connection->executeSqlQuery(sql, dataTable) && dataTable.rowCount() == 1) {
+            return dataTable.rows()[0]["id"].value().getValue(id);
+        }
+    }
+    return false;
+}
+
+bool ExcSimDatabase::containsButton(const String &name) {
+    uint64_t id;
+    return getButtonId(name, id);
 }
 
 String ExcSimDatabase::getTablePrefix() {

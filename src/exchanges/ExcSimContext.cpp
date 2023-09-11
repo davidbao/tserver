@@ -132,12 +132,12 @@ void Tag::evaluates(const Tag &other) {
     Item::evaluates(other);
 }
 
-Variant Tag::getValue(const Label *label, const SqlSelectFilter &filter) const {
+Variant Tag::getValue(const Element *element, const StringMap &filter) const {
     double minValue, maxValue, step;
     if (!parseRange(style, minValue, maxValue, step)) {
-        minValue = label->minValue;
-        maxValue = label->maxValue;
-        step = label->step;
+        minValue = element->minValue;
+        maxValue = element->maxValue;
+        step = element->step;
     }
 
     ServiceFactory *factory = ServiceFactory::instance();
@@ -148,7 +148,7 @@ Variant Tag::getValue(const Label *label, const SqlSelectFilter &filter) const {
     }
 
     Variant result;
-    const String key = String::format("%s.%s", label->name.c_str(), name.c_str());
+    const String key = String::format("%s.%s", element->name.c_str(), name.c_str());
     String oldValueStr = esc->getValue(key);
     if (String::equals(registerStr, "increase", true)) {
         double oldValue, value;
@@ -180,7 +180,7 @@ Variant Tag::getValue(const Label *label, const SqlSelectFilter &filter) const {
         double value = Random::getRandValue(minValue, maxValue);
         result = Variant(Variant::Float64, value);
     } else if (String::equals(registerStr, "sin", true)) {
-        const String xKey = String::format("%s.%s.x", label->name.c_str(), name.c_str());
+        const String xKey = String::format("%s.%s.x", element->name.c_str(), name.c_str());
         String oldXValueStr = esc->getValue(xKey);
         double oldXValue;
         Double::parse(oldXValueStr, oldXValue);
@@ -199,7 +199,7 @@ Variant Tag::getValue(const Label *label, const SqlSelectFilter &filter) const {
             value = maxValue;
         result = Variant(Variant::Float64, value);
     } else if (String::equals(registerStr, "cos", true)) {
-        const String xKey = String::format("%s.%s.x", label->name.c_str(), name.c_str());
+        const String xKey = String::format("%s.%s.x", element->name.c_str(), name.c_str());
         String oldXValueStr = esc->getValue(xKey);
         double oldXValue;
         Double::parse(oldXValueStr, oldXValue);
@@ -233,8 +233,7 @@ Variant Tag::getValue(const Label *label, const SqlSelectFilter &filter) const {
         StringArray texts;
         StringArray::parse(style.toString(), texts, ',');
         if (texts.count() > 0) {
-            const StringMap &values = filter.values();
-            for (auto it = values.begin(); it != values.end(); ++it) {
+            for (auto it = filter.begin(); it != filter.end(); ++it) {
                 const String &k = it.key();
                 const String &v = it.value();
 
@@ -251,7 +250,7 @@ Variant Tag::getValue(const Label *label, const SqlSelectFilter &filter) const {
             }
         }
     } else if (String::equals(registerStr, "incoming", true)) {
-        result = Variant(Variant::Text, filter.getValue(name));
+        result = Variant(Variant::Text, filter.at(name));
     } else {
         double value;
         if (Double::parse(registerStr, value)) {
@@ -1284,4 +1283,320 @@ String Table::toDeleteSqlStr(const String &prefix, const String &tableName) {
 
 String Table::getTableName(const String &prefix, const String &tableName) {
     return prefix.isNullOrEmpty() ? tableName : String::format("%s.%s", prefix.c_str(), tableName.c_str());
+}
+
+Button::Button(const String &name, double minValue, double maxValue, double step) :
+        Element(name, minValue, maxValue, step) {
+}
+
+Button::Button(const Button &other) : Element(other) {
+    Button::evaluates(other);
+}
+
+bool Button::equals(const Button &other) const {
+    return Element::equals(other) &&
+           this->results == other.results;
+}
+
+void Button::evaluates(const Button &other) {
+    Element::evaluates(other);
+    this->results = other.results;
+}
+
+void Button::updateYmlProperties(YmlNode::Properties &properties, int pos) const {
+    properties.add(String::format(ButtonPrefix "name", pos), name);
+    properties.add(String::format(ButtonPrefix "range", pos), toRangeStr());
+    properties.add(String::format(ButtonPrefix "step", pos), step);
+    for (size_t i = 0; i < results.count(); ++i) {
+        const Result &result = results[i];
+        properties.add(String::format(ResultPrefix "name", pos, i), result.name);
+        properties.add(String::format(ResultPrefix "register", pos, i), result.registerStr);
+        properties.add(String::format(ResultPrefix "style", pos, i), result.style);
+    }
+}
+
+void Button::removeYmlProperties(YmlNode::Properties &properties, int pos) const {
+    properties.remove(String::format(ButtonPrefix "name", pos));
+    properties.remove(String::format(ButtonPrefix "range", pos));
+    properties.remove(String::format(ButtonPrefix "step", pos));
+    properties.remove(String::format(ButtonPrefix "results", pos));
+    for (size_t i = 0; i < results.count(); ++i) {
+        const Result &result = results[i];
+        properties.remove(String::format(ResultPrefix "name", pos, i));
+        properties.remove(String::format(ResultPrefix "register", pos, i));
+        properties.remove(String::format(ResultPrefix "style", pos, i));
+    }
+}
+
+String Button::getTableName(const String &prefix, const String &tableName) {
+    return prefix.isNullOrEmpty() ? tableName : String::format("%s.%s", prefix.c_str(), tableName.c_str());
+}
+
+DataRow Button::toDataRow(const DataTable &table) const {
+    return DataRow({
+                           DataCell(table.columns()["name"], name),
+                           DataCell(table.columns()["range"], toRangeStr()),
+                           DataCell(table.columns()["step"], step),
+                           DataCell(table.columns()["results"], toValuesStr()),
+                   });
+}
+
+String Button::toValuesStr() const {
+    JsonNode resultNode("results", JsonNode::TypeArray);
+    for (size_t i = 0; i < results.count(); ++i) {
+        const Result &result = results[i];
+        JsonNode node;
+        node.add(JsonNode("name", result.name));
+        node.add(JsonNode("register", result.registerStr));
+        node.add(JsonNode("style", result.style));
+        resultNode.add(node);
+    }
+    return resultNode.toString();
+}
+
+bool Button::findItemName(const StringArray &itemNames) const {
+    for (size_t i = 0; i < itemNames.count(); ++i) {
+        const String &itemName = itemNames[i];
+        for (size_t j = 0; j < results.count(); ++j) {
+            if (results[j].name.find(itemName) >= 0) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+JsonNode Button::toJsonNode() const {
+    JsonNode node;
+    node.add(JsonNode("name", name));
+    node.add(JsonNode("range", toRangeStr()));
+    node.add(JsonNode("step", step));
+    node.add(JsonNode("results", toValuesStr()));
+    return node;
+}
+
+bool Button::parseResults(const String &str, Results &results) {
+    // str such like [{"name":"result1","register":"increase"},{"name":"result2","register":"decrease"},{"name":"result3","register":"random"}]
+    JsonNode resultsNode;
+    if (JsonNode::parse(str, resultsNode)) {
+        for (size_t i = 0; i < resultsNode.count(); ++i) {
+            JsonNode node = resultsNode.at(i);
+            Result result;
+            result.name = node.getAttribute("name").trim();
+            result.registerStr = node.getAttribute("register").trim();
+            Style::parse(node.getAttribute("style"), result.style);
+            results.add(result);
+        }
+        return results.count() > 0;
+    }
+    return false;
+}
+
+bool Button::parse(const StringMap &request, Button &button) {
+    if (!request.at("name", button.name)) {
+        return false;
+    }
+    if (!Button::parseRange(request["range"], button.minValue, button.maxValue)) {
+        return false;
+    }
+    if (!Double::parse(request["step"], button.step)) {
+        return false;
+    }
+    if (!Button::parseResults(request["results"], button.results)) {
+        return false;
+    }
+    return true;
+}
+
+bool Button::parse(const YmlNode::Properties &properties, int pos, Button &button) {
+    String name;
+    if (properties.at(String::format(ButtonPrefix "name", pos), name)) {
+        button.name = name;
+        properties.at(String::format(ButtonPrefix "enable", pos), button.enable);
+        String range;
+        properties.at(String::format(ButtonPrefix "range", pos), range);
+        Button::parseRange(range, button.minValue, button.maxValue);
+        properties.at(String::format(ButtonPrefix "step", pos), button.step);
+        for (int i = 0; i < MaxResultCount; i++) {
+            Result result;
+            if (!properties.at(String::format(ResultPrefix "name", pos, i), result.name)) {
+                break;
+            }
+            properties.at(String::format(ResultPrefix "register", pos, i), result.registerStr);
+            properties.at(String::format(ResultPrefix "style", pos, i), result.style);
+            button.results.add(result);
+        }
+        return true;
+    }
+    return false;
+}
+
+bool Button::parse(const DataRow &buttonRow, const DataRows &resultRows, Button &button) {
+    if (!buttonRow["name"].value().getValue(button.name)) {
+        return false;
+    }
+    if (!buttonRow["min_value"].value().getValue(button.minValue)) {
+        return false;
+    }
+    if (!buttonRow["max_value"].value().getValue(button.maxValue)) {
+        return false;
+    }
+    if (!buttonRow["step"].value().getValue(button.step)) {
+        return false;
+    }
+    for (size_t i = 0; i < resultRows.count(); ++i) {
+        const DataRow &row = resultRows[i];
+        Result result;
+        if (!row["name"].value().getValue(result.name)) {
+            return false;
+        }
+        row["register"].value().getValue(result.registerStr);
+        Style::parse(row["style"].valueStr(), result.style);
+        button.results.add(result);
+    }
+    return true;
+}
+
+bool Button::parse(const DataRow &row, Button &button) {
+    if (!row["name"].value().getValue(button.name)) {
+        return false;
+    }
+    if (!row["min_value"].value().getValue(button.minValue)) {
+        return false;
+    }
+    if (!row["max_value"].value().getValue(button.maxValue)) {
+        return false;
+    }
+    if (!row["step"].value().getValue(button.step)) {
+        return false;
+    }
+    if (!Button::parseResults(row["results"].valueStr(), button.results)) {
+        return false;
+    }
+    return true;
+}
+
+String Button::toSelectSqlStr(const String &prefix, const String &name) {
+    String buttonTableName = getTableName(prefix, ButtonTableName);
+    String resultTableName = getTableName(prefix, ResultTableName);
+    String resultsSql = String::format("(SELECT JSON_ARRAYAGG(JSON_OBJECT("
+                                    "'name',NAME,'register',register,'style',style))"
+                                    " FROM %s WHERE %s.button_id=%s.id) results",
+                                    resultTableName.c_str(),
+                                    resultTableName.c_str(),
+                                    buttonTableName.c_str());
+    String sql = String::format("SELECT id,name,min_value,max_value,step,%s FROM %s WHERE name='%s' LIMIT 1",
+                                resultsSql.c_str(),
+                                buttonTableName.c_str(),
+                                name.c_str());
+    return sql;
+}
+
+String Button::toSelectSqlStr(const String &prefix, const SqlSelectFilter &filter) {
+//    SELECT name,concat(concat(CAST(min_value as CHAR(64)),'-'),CAST(max_value as CHAR(64)))
+//    'range',step,(SELECT JSON_ARRAYAGG(JSON_OBJECT('name',NAME,'register',register,'style',style)) FROM result
+//    WHERE result.button_id=button.id AND name LIKE '%result%') results FROM button WHERE 1=1 ORDER BY name asc LIMIT 0,100
+    String buttonTableName = getTableName(prefix, ButtonTableName);
+    String resultTableName = getTableName(prefix, ResultTableName);
+    static const char *rangeStr = "concat(concat(CAST(min_value as CHAR(64)),'-'),"
+                                  "CAST(max_value as CHAR(64))) 'range'";
+    String resultsSql = String::format("(SELECT JSON_ARRAYAGG(JSON_OBJECT("
+                                    "'name',NAME,'register',register,'style',style))"
+                                    " FROM %s WHERE %s.button_id=%s.id AND %s) results",
+                                    resultTableName.c_str(),
+                                    resultTableName.c_str(),
+                                    buttonTableName.c_str(),
+                                    filter.toArrayLikeStr("results", "name").c_str());
+    String sql = String::format("SELECT name,%s,step,%s FROM %s WHERE %s ORDER BY %s LIMIT %d,%d",
+                                rangeStr,
+                                resultsSql.c_str(),
+                                buttonTableName.c_str(),
+                                filter.toLikeStr("name").c_str(),
+                                !filter.orderBy().isNullOrEmpty() ? filter.orderBy().c_str() : "name asc",
+                                filter.offset(), filter.limit());
+    return sql;
+}
+
+String Button::toCountSqlStr(const String &prefix, const SqlSelectFilter &filter) {
+    String buttonTableName = getTableName(prefix, ButtonTableName);
+    String sql = String::format("SELECT COUNT(1) FROM %s WHERE %s",
+                                buttonTableName.c_str(),
+                                filter.toLikeStr("name").c_str());
+    return sql;
+}
+
+String Button::toInsertSqlStr(const String &prefix) const {
+    String sql;
+    DateTime now = DateTime::now();
+    uint64_t lid = SnowFlake::generateId();
+    String buttonTableName = getTableName(prefix, ButtonTableName);
+    String resultTableName = getTableName(prefix, ResultTableName);
+    sql = String::format("INSERT INTO %s VALUES(%lld,'%s',%llg,%llg,%llg,'%s','','%s','');",
+                         buttonTableName.c_str(),
+                         lid, name.c_str(),
+                         minValue, maxValue, step,
+                         now.toString().c_str(), now.toString().c_str());
+    for (size_t i = 0; i < results.count(); ++i) {
+        const Result &result = results[i];
+        sql.appendLine(String::format("INSERT INTO %s VALUES(%lld,%lld,'%s','%s','%s','%s','','%s','');",
+                                      resultTableName.c_str(),
+                                      SnowFlake::generateId(), lid,
+                                      result.name.c_str(), result.registerStr.c_str(), result.style.toString().c_str(),
+                                      now.toString().c_str(), now.toString().c_str()));
+    }
+    return sql;
+}
+
+String Button::toReplaceSqlStr(const String &prefix) const {
+    String sql;
+    DateTime now = DateTime::now();
+    String buttonTableName = getTableName(prefix, ButtonTableName);
+    String resultTableName = getTableName(prefix, ResultTableName);
+    sql = String::format(
+            "UPDATE %s SET min_value=%llg,max_value=%llg,step=%llg,update_time='%s',update_user='' WHERE name='%s';",
+            buttonTableName.c_str(),
+            minValue, maxValue, step,
+            now.toString().c_str(), name.c_str());
+    String idSelectStr = String::format("(SELECT id FROM %s WHERE name='%s')", buttonTableName.c_str(), name.c_str());
+    sql.appendLine(String::format("DELETE FROM %s WHERE button_id=%s", idSelectStr.c_str()));
+    for (size_t i = 0; i < results.count(); ++i) {
+        const Result &result = results[i];
+        sql.appendLine(String::format("INSERT INTO %s VALUES(%lld,%s,'%s','%s','%s','%s','','%s','');",
+                                      resultTableName.c_str(),
+                                      SnowFlake::generateId(),
+                                      idSelectStr.c_str(),
+                                      result.name.c_str(), result.registerStr.c_str(), result.style.toString().c_str(),
+                                      now.toString().c_str(), now.toString().c_str()));
+    }
+    return sql;
+}
+
+String Button::toDeleteSqlStr(const String &prefix, const String &buttonName) {
+    String sql;
+    String buttonTableName = getTableName(prefix, ButtonTableName);
+    String resultTableName = getTableName(prefix, ResultTableName);
+    String idSelectStr = String::format("(SELECT id FROM %s WHERE name='%s')", buttonTableName.c_str(),
+                                        buttonName.c_str());
+    sql.appendLine(String::format("DELETE FROM %s WHERE button_id=%s;",
+                                  resultTableName.c_str(),
+                                  idSelectStr.c_str()));
+    sql.appendLine(String::format("DELETE FROM %s WHERE name='%s';",
+                                  buttonTableName.c_str(),
+                                  buttonName.c_str()));
+    return sql;
+}
+
+bool Button::getResults(const StringArray &resultNames, Results &values) const {
+    if (resultNames.isEmpty()) {
+        values.addRange(results);
+    } else {
+        for (size_t i = 0; i < resultNames.count(); ++i) {
+            const String &resultName = resultNames[i];
+            Result result;
+            if (results.atByName(resultName, result)) {
+                values.add(result);
+            }
+        }
+    }
+    return values.count() > 0;
 }

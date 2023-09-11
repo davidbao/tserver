@@ -29,6 +29,8 @@ public:
     FetchResult getTableValues(const String &tableName, const StringArray &colNames,
                                const SqlSelectFilter &filter, DataTable &dataTable) override;
 
+    FetchResult execButton(const String &buttonName, const StringMap &params, VariantMap &results) override;
+
     // Labels
     bool getLabels(const SqlSelectFilter &filter, DataTable &table);
 
@@ -50,6 +52,17 @@ public:
     bool removeTable(const StringMap &request, StringMap &response);
 
     bool updateTable(const StringMap &request, StringMap &response);
+
+    // Buttons
+    bool getButtons(const SqlSelectFilter &filter, DataTable &table);
+
+    bool getButton(const StringMap &request, StringMap &response);
+
+    bool addButton(const StringMap &request, StringMap &response);
+
+    bool removeButton(const StringMap &request, StringMap &response);
+
+    bool updateButton(const StringMap &request, StringMap &response);
 
 private:
     bool loadData();

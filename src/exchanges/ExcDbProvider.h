@@ -28,6 +28,8 @@ public:
     FetchResult getTableValues(const String &tableName, const StringArray &colNames,
                                const SqlSelectFilter &filter, DataTable &table) override;
 
+    FetchResult execButton(const String &buttonName, const StringMap &params, VariantMap &results) override;
+
 private:
     SqlConnection *connection() const;
 

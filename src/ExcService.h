@@ -28,6 +28,8 @@ public:
 
     FetchResult getTableValues(const JsonNode &request, JsonNode &response);
 
+    FetchResult execButton(const JsonNode &request, JsonNode &response);
+
     bool getType(const StringMap &request, StringMap &response);
 
     bool setType(const StringMap &request, StringMap &response);
@@ -53,6 +55,17 @@ public:
     bool removeTable(const StringMap &request, StringMap &response);
 
     bool updateTable(const StringMap &request, StringMap &response);
+
+    // Buttons
+    bool getButtons(const SqlSelectFilter &filter, DataTable &table);
+
+    bool getButton(const StringMap &request, StringMap &response);
+
+    bool addButton(const StringMap &request, StringMap &response);
+
+    bool removeButton(const StringMap &request, StringMap &response);
+
+    bool updateButton(const StringMap &request, StringMap &response);
 
 private:
     String type() const;

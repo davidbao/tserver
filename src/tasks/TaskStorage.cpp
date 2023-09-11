@@ -34,6 +34,8 @@ bool TaskFile::load() {
 void TaskFile::rescan() {
     static uint64_t tick = Environment::getTickCount();
     if (Environment::getTickCount() - tick >= 30 * 1000) {
+        tick = Environment::getTickCount();
+
         String fileName = this->fileName();
 
         DateTime modifyTime;

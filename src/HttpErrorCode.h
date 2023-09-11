@@ -23,6 +23,8 @@ enum HttpErrorCode {
     FailedToParseLabel = 55,        // Failed to parse label.
     FailedToParseTable = 56,        // Failed to parse table.
     SimulatorDbError = 57,          // Simulator database error.
+    FailedToParseButton = 58,       // Failed to parse button.
+    CannotFindButton = 59,          // Can not find button by name.
 
     // task
     CannotFindTask = 60,            // Can not find task by name.
@@ -59,6 +61,8 @@ public:
                                        {FailedToParseLabel,       "Failed to parse label."},
                                        {FailedToParseTable,       "Failed to parse table."},
                                        {SimulatorDbError,         "Simulator database error."},
+                                       {FailedToParseButton,      "Failed to parse button."},
+                                       {CannotFindButton,         "Can not find button by name."},
                                        {CannotFindTask,           "Can not find task by name."},
                                        {CannotFindFile,           "Can not find the upload file."},
                                        {FailedToVerifyMd5,        "Failed to verify the upload file md5."},

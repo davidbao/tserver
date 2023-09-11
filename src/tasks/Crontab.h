@@ -27,10 +27,11 @@ class Crontab : public IEvaluation<Crontab>, public IEquatable<Crontab> {
 public:
     String name;
     bool enable;
+    StringArray resultNames;
 
     Crontab();
 
-    explicit Crontab(const String &name, Schedule *schedule, Execution *execution);
+    explicit Crontab(const String &name, Schedule *schedule, Execution *execution, const StringArray &resultNames);
 
     Crontab(const Crontab &other);
 
@@ -57,6 +58,8 @@ public:
     void removeFile();
 
     bool isValid() const;
+
+    bool hasResult() const;
 
     bool findName(const String &n) const;
 
@@ -89,6 +92,8 @@ private:
     static bool parseSchedule(const String &str, Schedule *&schedule);
 
     static bool parseExecution(const String &str, Execution *&execution);
+
+    static bool parseResult(const String &str, StringArray &results);
 
     static String getTableName(const String &prefix, const String &tableName);
 
