@@ -84,6 +84,8 @@ if (${CMAKE_BUILD_TYPE} STREQUAL "Debug")
 else (${CMAKE_SYSTEM_NAME} STREQUAL "Release")
 endif ()
 
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wl,--allow-multiple-definition")
+
 # src path.
 add_subdirectory(src)
 
