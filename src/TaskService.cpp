@@ -19,7 +19,9 @@
 #include "tasks/TaskStorage.h"
 #include "tasks/TaskCache.h"
 #include "tasks/Execution.h"
+#ifndef WIN32
 #include <sys/wait.h>
+#endif
 
 using namespace IO;
 using namespace Config;

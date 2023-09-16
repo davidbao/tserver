@@ -16,12 +16,17 @@ project(tserver)
 
 option(TSERVER_STATIC_STDLIB "Option for build with static libstdc++" OFF)
 option(TSERVER_ENABLE_TEST "Option for build with test" ON)
+option(TSERVER_BUILD_SQLITE "Option for build with sqlite" ON)
+option(TSERVER_BUILD_MYSQL "Option for build with mysql" ON)
+option(TSERVER_BUILD_MYSQL_STATIC "Option for build with mysql static lib" ON)
+option(TSERVER_BUILD_ORACLE "Option for build with oracle" OFF)
 option(TSERVER_BUILD_KINGBASE "Option for build with Kingbase" OFF)
 option(TSERVER_BUILD_DM6 "Option for build with dm6" OFF)
+option(TSERVER_BUILD_DM7 "Option for build with dm7" OFF)
 
 ## build settings
 set(TSERVER_VERSION_MAJOR 1)
-set(TSERVER_VERSION_MINOR 2)
+set(TSERVER_VERSION_MINOR 3)
 set(TSERVER_VERSION_PATCH 0)
 set(TSERVER_VERSION ${TSERVER_VERSION_MAJOR}.${TSERVER_VERSION_MINOR}.${TSERVER_VERSION_PATCH})
 
@@ -62,8 +67,13 @@ endif ()
 # show options.
 message(STATUS "TSERVER_STATIC_STDLIB: " ${TSERVER_STATIC_STDLIB})
 message(STATUS "TSERVER_ENABLE_TEST: " ${TSERVER_ENABLE_TEST})
+message(STATUS "TSERVER_BUILD_SQLITE: " ${TSERVER_BUILD_SQLITE})
+message(STATUS "TSERVER_BUILD_MYSQL:" ${TSERVER_BUILD_MYSQL})
+message(STATUS "TSERVER_BUILD_MYSQL_STATIC:" ${TSERVER_BUILD_MYSQL_STATIC})
+message(STATUS "TSERVER_BUILD_ORACLE:" ${TSERVER_BUILD_ORACLE})
 message(STATUS "TSERVER_BUILD_KINGBASE: " ${TSERVER_BUILD_KINGBASE})
 message(STATUS "TSERVER_BUILD_DM6: " ${TSERVER_BUILD_DM6})
+message(STATUS "TSERVER_BUILD_DM7: " ${TSERVER_BUILD_DM7})
 
 # set externals path.
 set(EXTERNALS_PATH ${CMAKE_SOURCE_DIR}/externals)
@@ -83,8 +93,6 @@ if (${CMAKE_BUILD_TYPE} STREQUAL "Debug")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DDEBUG")
 else (${CMAKE_SYSTEM_NAME} STREQUAL "Release")
 endif ()
-
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wl,--allow-multiple-definition")
 
 # src path.
 add_subdirectory(src)

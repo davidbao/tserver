@@ -156,7 +156,7 @@ FetchResult ExcDbProvider::execButton(const String &buttonName, const StringMap 
     auto storage = ts->storage();
     if (storage != nullptr) {
         Crontab crontab;
-        if (storage->getTask(buttonName, crontab) && crontab.hasResult() > 0) {
+        if (storage->getTask(buttonName, crontab) && crontab.hasResult()) {
             auto saveParams = [](SqlConnection *connection, const String &buttonName,
                                  const StringMap &params, uint64_t &id) {
                 id = SnowFlake::generateId();

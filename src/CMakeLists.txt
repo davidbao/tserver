@@ -50,8 +50,10 @@ elseif (UNIX)
     set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
 endif ()
 set(EXTERNALS_LIB
-        mysqlclient${CMAKE_FIND_LIBRARY_SUFFIXES}
-        sqlite3${CMAKE_FIND_LIBRARY_SUFFIXES}
+        paho-mqtt3a-static${CMAKE_FIND_LIBRARY_SUFFIXES}
+        paho-mqtt3as-static${CMAKE_FIND_LIBRARY_SUFFIXES}
+        paho-mqtt3c-static${CMAKE_FIND_LIBRARY_SUFFIXES}
+        paho-mqtt3cs-static${CMAKE_FIND_LIBRARY_SUFFIXES}
         event_openssl${CMAKE_FIND_LIBRARY_SUFFIXES}
         event${CMAKE_FIND_LIBRARY_SUFFIXES}
         curl${CMAKE_FIND_LIBRARY_SUFFIXES}
@@ -63,17 +65,10 @@ set(EXTERNALS_LIB
         ssl${CMAKE_FIND_LIBRARY_SUFFIXES}
         crypto${CMAKE_FIND_LIBRARY_SUFFIXES}
         json${CMAKE_FIND_LIBRARY_SUFFIXES}
-        paho-mqtt3a-static${CMAKE_FIND_LIBRARY_SUFFIXES}
-        paho-mqtt3as-static${CMAKE_FIND_LIBRARY_SUFFIXES}
-        paho-mqtt3c-static${CMAKE_FIND_LIBRARY_SUFFIXES}
-        paho-mqtt3cs-static${CMAKE_FIND_LIBRARY_SUFFIXES}
         )
 
 if (NOT WIN_OS)
-    set(EXTERNALS_LIB
-            event_pthreads${CMAKE_FIND_LIBRARY_SUFFIXES}
-            ${EXTERNALS_LIB}
-            )
+    set(EXTERNALS_LIB event_pthreads${CMAKE_FIND_LIBRARY_SUFFIXES} ${EXTERNALS_LIB} )
 endif ()
 
 if (TSERVER_STATIC_STDLIB)
@@ -94,6 +89,19 @@ elseif (WEB_OS)
     set(EXTERNALS_LIB ${EXTERNALS_LIB})
 endif ()
 
+if (TSERVER_BUILD_SQLITE)
+    set(EXTERNALS_LIB sqlite3${CMAKE_FIND_LIBRARY_SUFFIXES} ${EXTERNALS_LIB})
+endif ()
+if (TSERVER_BUILD_MYSQL)
+    if (TSERVER_BUILD_MYSQL_STATIC)
+        set(EXTERNALS_LIB mysqlclient${CMAKE_FIND_LIBRARY_SUFFIXES} ${EXTERNALS_LIB})
+    else ()
+        set(EXTERNALS_LIB mysqlclient ${EXTERNALS_LIB})
+    endif ()
+
+endif ()
+if (TSERVER_BUILD_ORACLE)
+endif ()
 if (TSERVER_BUILD_KINGBASE)
     if (WIN_OS)
         set(EXTERNALS_LIB kci ${EXTERNALS_LIB})
@@ -101,14 +109,27 @@ if (TSERVER_BUILD_KINGBASE)
         set(EXTERNALS_LIB kci crypto ${EXTERNALS_LIB})
     endif ()
 endif ()
-
 if (TSERVER_BUILD_DM6)
-    set(EXTERNALS_LIB dmapi ${EXTERNALS_LIB})
+    if (TSERVER_BUILD_DM6_STATIC)
+        set(EXTERNALS_LIB dmapi${CMAKE_FIND_LIBRARY_SUFFIXES} ${EXTERNALS_LIB})
+        if (NOT WIN_OS)
+            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wl,--allow-multiple-definition")
+        endif()
+    else ()
+        set(EXTERNALS_LIB dmapi ${EXTERNALS_LIB})
+    endif ()
+endif ()
+if (TSERVER_BUILD_DM7)
+    if (TSERVER_BUILD_DM7_STATIC)
+        set(EXTERNALS_LIB dmdpi${CMAKE_FIND_LIBRARY_SUFFIXES} ${EXTERNALS_LIB})
+    else ()
+        set(EXTERNALS_LIB dmdpi ${EXTERNALS_LIB})
+    endif ()
 endif ()
 
 set(COMMON_LIB common${CMAKE_FIND_LIBRARY_SUFFIXES} ${EXTERNALS_LIB})
 set(TSERVER_LIB ${COMMON_LIB})
-#    message(STATUS "TSERVER_LIB: " ${TSERVER_LIB})
+#message(STATUS "TSERVER_LIB: " ${TSERVER_LIB})
 
 # application settings
 set(TSERVER_SRC main)
