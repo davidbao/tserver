@@ -30,7 +30,9 @@ enum FetchResult {
     NodeNotFound = 6,
     DbError = 7,
     LabelNotFound = 8,
-    TableNotFound = 9
+    TableNotFound = 9,
+    ButtonNotFound = 10,
+    ButtonParamError = 11
 };
 
 #define ExcPrefix "summer.exchange."

@@ -23,6 +23,7 @@ option(TSERVER_BUILD_ORACLE "Option for build with oracle" OFF)
 option(TSERVER_BUILD_KINGBASE "Option for build with Kingbase" OFF)
 option(TSERVER_BUILD_DM6 "Option for build with dm6" OFF)
 option(TSERVER_BUILD_DM7 "Option for build with dm7" OFF)
+option(TSERVER_BUILD_MQTTCLIENT "Option for build with mqtt client(use paho.mqtt.c)" ON)
 
 ## build settings
 set(TSERVER_VERSION_MAJOR 1)
@@ -74,6 +75,7 @@ message(STATUS "TSERVER_BUILD_ORACLE:" ${TSERVER_BUILD_ORACLE})
 message(STATUS "TSERVER_BUILD_KINGBASE: " ${TSERVER_BUILD_KINGBASE})
 message(STATUS "TSERVER_BUILD_DM6: " ${TSERVER_BUILD_DM6})
 message(STATUS "TSERVER_BUILD_DM7: " ${TSERVER_BUILD_DM7})
+message(STATUS "TSERVER_BUILD_MQTTCLIENT: " ${TSERVER_BUILD_MQTTCLIENT})
 
 # set externals path.
 set(EXTERNALS_PATH ${CMAKE_SOURCE_DIR}/externals)

@@ -160,6 +160,18 @@ FetchResult ExcSimProvider::execButton(const String &buttonName, const StringMap
     if (_storage != nullptr) {
         Button button;
         if (_storage->getButton(buttonName, button)) {
+            // Verify parameters.
+            if (button.parameters.count() != params.count()) {
+                return FetchResult::ButtonParamError;
+            }
+            for (auto it = params.begin(); it != params.end(); ++it) {
+                const String &param = it.key();
+                if (!button.parameters.contains(param, true)) {
+                    return FetchResult::ButtonParamError;
+                }
+            }
+
+            // Retrieve results.
             for (size_t i = 0; i < button.results.count(); i++) {
                 const Result &result = button.results[i];
                 results.add(result.name, result.getValue(&button, params));
@@ -167,7 +179,7 @@ FetchResult ExcSimProvider::execButton(const String &buttonName, const StringMap
             return FetchResult::Succeed;
         } else {
             Trace::error(String::format("Can not find a button, name: %s", buttonName.c_str()));
-            return FetchResult::LabelNotFound;
+            return FetchResult::ButtonNotFound;
         }
     }
 

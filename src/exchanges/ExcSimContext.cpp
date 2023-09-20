@@ -1295,12 +1295,14 @@ Button::Button(const Button &other) : Element(other) {
 
 bool Button::equals(const Button &other) const {
     return Element::equals(other) &&
-           this->results == other.results;
+           this->results == other.results &&
+           this->parameters == other.parameters;
 }
 
 void Button::evaluates(const Button &other) {
     Element::evaluates(other);
     this->results = other.results;
+    this->parameters = other.parameters;
 }
 
 void Button::updateYmlProperties(YmlNode::Properties &properties, int pos) const {
@@ -1405,6 +1407,7 @@ bool Button::parse(const StringMap &request, Button &button) {
     if (!Button::parseResults(request["results"], button.results)) {
         return false;
     }
+    StringArray::parse(request["parameters"], button.parameters);
     return true;
 }
 
@@ -1417,6 +1420,13 @@ bool Button::parse(const YmlNode::Properties &properties, int pos, Button &butto
         properties.at(String::format(ButtonPrefix "range", pos), range);
         Button::parseRange(range, button.minValue, button.maxValue);
         properties.at(String::format(ButtonPrefix "step", pos), button.step);
+        for (int i = 0; i < MaxParameterCount; i++) {
+            String pname;
+            if (!properties.at(String::format(ParameterPrefix "name", pos, i), pname)) {
+                break;
+            }
+            button.parameters.add(pname);
+        }
         for (int i = 0; i < MaxResultCount; i++) {
             Result result;
             if (!properties.at(String::format(ResultPrefix "name", pos, i), result.name)) {
@@ -1454,6 +1464,7 @@ bool Button::parse(const DataRow &buttonRow, const DataRows &resultRows, Button 
         Style::parse(row["style"].valueStr(), result.style);
         button.results.add(result);
     }
+    StringArray::parse(buttonRow["parameters"].valueStr(), button.parameters);
     return true;
 }
 
@@ -1473,6 +1484,7 @@ bool Button::parse(const DataRow &row, Button &button) {
     if (!Button::parseResults(row["results"].valueStr(), button.results)) {
         return false;
     }
+    StringArray::parse(row["parameters"].valueStr(), button.parameters);
     return true;
 }
 

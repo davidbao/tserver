@@ -50,10 +50,6 @@ elseif (UNIX)
     set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
 endif ()
 set(EXTERNALS_LIB
-        paho-mqtt3a-static${CMAKE_FIND_LIBRARY_SUFFIXES}
-        paho-mqtt3as-static${CMAKE_FIND_LIBRARY_SUFFIXES}
-        paho-mqtt3c-static${CMAKE_FIND_LIBRARY_SUFFIXES}
-        paho-mqtt3cs-static${CMAKE_FIND_LIBRARY_SUFFIXES}
         event_openssl${CMAKE_FIND_LIBRARY_SUFFIXES}
         event${CMAKE_FIND_LIBRARY_SUFFIXES}
         curl${CMAKE_FIND_LIBRARY_SUFFIXES}
@@ -125,6 +121,15 @@ if (TSERVER_BUILD_DM7)
     else ()
         set(EXTERNALS_LIB dmdpi ${EXTERNALS_LIB})
     endif ()
+endif ()
+
+if (TSERVER_BUILD_MQTTCLIENT)
+    set(EXTERNALS_LIB
+            paho-mqtt3a-static${CMAKE_FIND_LIBRARY_SUFFIXES}
+            paho-mqtt3as-static${CMAKE_FIND_LIBRARY_SUFFIXES}
+            paho-mqtt3c-static${CMAKE_FIND_LIBRARY_SUFFIXES}
+            paho-mqtt3cs-static${CMAKE_FIND_LIBRARY_SUFFIXES}
+            ${EXTERNALS_LIB})
 endif ()
 
 set(COMMON_LIB common${CMAKE_FIND_LIBRARY_SUFFIXES} ${EXTERNALS_LIB})

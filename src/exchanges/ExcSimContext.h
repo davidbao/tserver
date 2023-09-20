@@ -42,6 +42,8 @@ using namespace System;
 #define ButtonPrefix "buttons[%d]."
 #define MaxResultCount 1000
 #define ResultPrefix ButtonPrefix "results[%d]."
+#define MaxParameterCount 100
+#define ParameterPrefix ButtonPrefix "parameters[%d]."
 
 // for database.
 #define LabelTableName "sim_label"
@@ -331,6 +333,7 @@ class Button : public Element, public IEvaluation<Button>, public IEquatable<But
 public:
     using Element::findItemName;
 
+    StringArray parameters;
     Results results;
 
     Button() = default;
