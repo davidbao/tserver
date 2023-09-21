@@ -16,6 +16,7 @@
 #include "ExcService.h"
 
 using namespace Data;
+using namespace Config;
 using namespace Microservice;
 
 WebService::WebService() = default;

@@ -7,6 +7,9 @@
 //
 
 #include "AdminService.h"
+#include "IO/Zip.h"
+#include "IO/Path.h"
+#include "IO/File.h"
 #include "IO/Directory.h"
 #include "system/ServiceFactory.h"
 #include "system/Application.h"
