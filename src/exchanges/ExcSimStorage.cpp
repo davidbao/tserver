@@ -228,6 +228,8 @@ bool ExcSimFile::removeLabel(const StringMap &request, StringMap &response) {
 }
 
 bool ExcSimFile::getTable(const String &name, Table &table) {
+    rescan();
+
     for (int i = 0; i < MaxTableCount; i++) {
         Table t;
         if (!Table::parse(_properties, i, t)) {
@@ -242,6 +244,8 @@ bool ExcSimFile::getTable(const String &name, Table &table) {
 }
 
 bool ExcSimFile::getTables(const SqlSelectFilter &filter, DataTable &table) {
+    rescan();
+
     Locker locker(&_properties);
     Tables match;
     String name = filter.getValue("name");

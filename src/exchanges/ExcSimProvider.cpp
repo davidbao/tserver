@@ -94,22 +94,23 @@ FetchResult ExcSimProvider::getTableValues(const String &tableName, const String
 
             // add rows.
             int start = table.rowCount() < filter.pageSize() ? 0 : filter.offset();
-            int next = start + filter.pageSize();
-            int end = table.rowCount() < filter.pageSize() ?
-                      table.rowCount() :
-                      (next < table.rowCount() ? next : table.rowCount());
-            for (int i = start; i < end; ++i) {
+            for (int i = start; i < table.rowCount(); ++i) {
                 bool validRow = true;
                 DataRow dataRow;
                 for (int j = 0; j < (int) columns.count(); ++j) {
                     const Column &col = columns[j];
                     Variant value = col.getCellValue(&table, filter, i, j);
-                    if (value.isNullValue())
+                    if (value.isNullValue()) {
                         validRow = false;
+                        break;
+                    }
                     dataRow.addCell(DataCell(dataTable.columns()[col.name], value));
                 }
                 if (validRow) {
                     dataTable.addRow(dataRow);
+                    if (dataTable.rowCount() >= filter.pageSize()) {
+                        break;
+                    }
                 }
             }
 

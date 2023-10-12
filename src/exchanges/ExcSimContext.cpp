@@ -778,7 +778,17 @@ Variant Column::getCellValue(const Table *table, const SqlSelectFilter &filter, 
                 }
             }
             if (row < texts.count()) {
-                result = Variant(Variant::Text, String::trim(texts[row], '\'', '"', ' '));
+                String value = String::trim(texts[row], '\'', '"', ' ');
+                String condition = filter.getValue(name);
+                if (condition.isNullOrEmpty() || condition == value) {
+                    result = Variant(Variant::Text, value);
+                } else if (condition.find("like") >= 0) {
+                    // like
+                    String temp = String::replace(condition, "like", String::Empty).trim();
+                    if (value.toLower().contains(temp.toLower())) {
+                        result = Variant(Variant::Text, value);
+                    }
+                }
             } else {
                 result = Variant(Variant::Text, String::Empty);
             }
