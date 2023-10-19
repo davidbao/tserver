@@ -155,29 +155,37 @@ FetchResult ExcDbProvider::execButton(const String &buttonName, const StringMap 
     assert(ts);
     auto storage = ts->storage();
     if (storage != nullptr) {
+        static const char *idStr = "id";
+        static const char *operationTimeStr = "operation_time";
+        static const char *operationUserStr = "operation_user";
+
         Crontab crontab;
         if (storage->getTask(buttonName, crontab) && crontab.hasResult()) {
             auto saveParams = [](SqlConnection *connection, const String &buttonName,
                                  const StringMap &params, uint64_t &id) {
-                id = SnowFlake::generateId();
+                StringMap other = params;
+                if (!other.contains(operationTimeStr)) {
+                    other.add(operationTimeStr, DateTime::now());
+                }
+                if (!other.contains(operationUserStr)) {
+                    other.add(operationUserStr, DbValue::NullValue);
+                }
+
                 String prefix = getTablePrefix();
                 String tableName = prefix.isNullOrEmpty() ?
                                    buttonName :
                                    String::format("%s.%s", prefix.c_str(), buttonName.c_str());
                 DataTable table(tableName);
-                table.addColumn(DataColumn("id", DbType::Integer64, true));
-                table.addColumn(DataColumn("operation_time", DbType::Timestamp));
-                table.addColumn(DataColumn("operation_user", DbType::Text));
-                for (auto it = params.begin(); it != params.end(); ++it) {
+                table.addColumn(DataColumn(idStr, DbType::Integer64, true));
+                for (auto it = other.begin(); it != other.end(); ++it) {
                     const String &key = it.key();
                     table.addColumn(DataColumn(key, DbType::Text));
                 }
+
                 DataRow row;
-                row.addCell(DataCell(table.getColumn("id"), id));
-                DateTime now = DateTime::now();
-                row.addCell(DataCell(table.getColumn("operation_time"), now));
-                row.addCell(DataCell(table.getColumn("operation_user"), DbValue::NullValue));
-                for (auto it = params.begin(); it != params.end(); ++it) {
+                id = SnowFlake::generateId();
+                row.addCell(DataCell(table.getColumn(idStr), id));
+                for (auto it = other.begin(); it != other.end(); ++it) {
                     const String &key = it.key();
                     const String &value = it.value();
                     row.addCell(DataCell(table.getColumn(key), value));
@@ -192,14 +200,14 @@ FetchResult ExcDbProvider::execButton(const String &buttonName, const StringMap 
                 String tableName = prefix.isNullOrEmpty() ?
                                    buttonName :
                                    String::format("%s.%s", prefix.c_str(), buttonName.c_str());
-                String sql = String::format("SELECT * FROM %s WHERE ID=%lld", tableName.c_str(), id);
+                String sql = String::format("SELECT * FROM %s WHERE ID=%" PRIu64, tableName.c_str(), id);
                 if (connection->executeSqlQuery(sql, table) && table.rowCount() == 1) {
                     const DataCells &cells = table.rows()[0].cells();
                     for (size_t i = 0; i < cells.count(); ++i) {
                         const DataCell &cell = cells[i];
-                        if (!(String::equals(cell.columnName(), "id", true) ||
-                              String::equals(cell.columnName(), "operation_time", true) ||
-                              String::equals(cell.columnName(), "operation_user", true) ||
+                        if (!(String::equals(cell.columnName(), idStr, true) ||
+                              String::equals(cell.columnName(), operationTimeStr, true) ||
+                              String::equals(cell.columnName(), operationUserStr, true) ||
                               params.contains(cell.columnName()))) {
                             results.add(cell.columnName(), cell.value());
                         }
