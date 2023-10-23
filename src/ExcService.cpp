@@ -117,8 +117,8 @@ FetchResult ExcService::getLabelValues(const JsonNode &request, JsonNode &respon
                 if (result == FetchResult::Succeed) {
                     JsonNode tagsNode("tags");
                     for (auto it = values.begin(); it != values.end(); ++it) {
-                        auto tagName = it.key();
-                        auto tagValue = it.value();
+                        const auto& tagName = it.key();
+                        const auto& tagValue = it.value();
                         if (responseStyle == "string") {
                             tagsNode.add(JsonNode(tagName, tagValue.toString()));
                         } else {
@@ -226,18 +226,55 @@ FetchResult ExcService::execButton(const JsonNode &request, JsonNode &response) 
             for (size_t i = 0; i < nodes.count(); ++i) {
                 const JsonNode &node = nodes[i];
                 String name = node.getAttribute("name");
+
+                auto toParameters = [](const DataTable &table, StringMap &params) {
+                    for (size_t i = 0; i < table.columnCount(); ++i) {
+                        const String &colName = table.columns()[i].name();
+                        JsonNode valueNode(JsonNode::TypeArray);
+                        for (size_t j = 0; j < table.rowCount(); ++j) {
+                            const DataRow &row = table.rows()[j];
+                            valueNode.add(JsonNode("item", row.cells()[i].valueStr()));
+                        }
+                        params.add(colName, valueNode.toString());
+                    }
+                };
+
+                auto updateTimeAndUser = [](const JsonNode &node, StringMap &params) {
+                    static const char *operationTimeStr = "operation_time";
+                    static const char *operationUserStr = "operation_user";
+
+                    DateTime time;
+                    if (node.getAttribute("time", time)) {
+                        params.add(operationTimeStr, time);
+                    }
+                    String user;
+                    if (node.getAttribute("user", user)) {
+                        params.add(operationUserStr, user);
+                    }
+                };
+
                 StringMap params(true);
-                node["parameters"].getAttribute(params);
                 VariantMap values;
-                FetchResult result = provider->execButton(name, params, values);
+                FetchResult result = FetchResult::NodeNotFound;
+                if (node.hasAttribute("parameters")) {
+                    node["parameters"].getAttribute(params);
+                    updateTimeAndUser(node, params);
+                    result = provider->execButton(name, params, values);
+                } else if (node.hasAttribute("table")) {
+                    DataTable table("table");
+                    DataTable::parse(node.at("table"), table);
+                    toParameters(table, params);
+                    updateTimeAndUser(node, params);
+                    result = provider->execButton(name, params, values);
+                }
                 JsonNode iNode("item");
                 iNode.add(JsonNode("name", name));
                 iNode.add(JsonNode("errorCode", (int) result));
                 if (result == FetchResult::Succeed) {
                     JsonNode resultsNode("results");
                     for (auto it = values.begin(); it != values.end(); ++it) {
-                        auto resultName = it.key();
-                        auto resultValue = it.value();
+                        const auto& resultName = it.key();
+                        const auto& resultValue = it.value();
                         if (responseStyle == "string") {
                             resultsNode.add(JsonNode(resultName, resultValue.toString()));
                         } else {
