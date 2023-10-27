@@ -43,6 +43,8 @@ private:
 
     static String getTablePrefix();
 
+    static String updateSql(const SqlSelectFilter &filter, const String &sql);
+
 private:
 #define DatabasePrefix ExcPrefix "database."
 

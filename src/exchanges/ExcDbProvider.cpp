@@ -50,6 +50,17 @@ void ExcDbProvider::createSqlFile(const String &fileName, const String &sql) {
     return ds->createSqlFile(fileName, sql);
 }
 
+String ExcDbProvider::updateSql(const SqlSelectFilter &filter, const String &sql) {
+    String str = sql;
+    const StringMap &values = filter.values();
+    for (auto it = values.begin(); it != values.end(); ++it) {
+        const String &k = it.key();
+        const String &v = it.value();
+        str = str.replace(String::format("$%s", k.c_str()), v);
+    }
+    return str;
+}
+
 FetchResult ExcDbProvider::getLabelValues(const String &labelName, const StringArray &tagNames,
                                           const SqlSelectFilter &filter, VariantMap &values) {
     SqlConnection *connection = this->connection();
@@ -62,7 +73,8 @@ FetchResult ExcDbProvider::getLabelValues(const String &labelName, const StringA
         String prefix = getTablePrefix();
         String name = prefix.isNullOrEmpty() ? labelName : String::format("%s.%s", prefix.c_str(), labelName.c_str());
         sql = filter.toSelectSql(name, tagNames.toString(','));
-//        sql = String::format("SELECT %s FROM %s limit 1", tagNames.toString(',').c_str(), name.c_str());
+    } else {
+        sql = updateSql(filter, sql);
     }
 
     if (_logSqlInfo) {
@@ -120,6 +132,8 @@ FetchResult ExcDbProvider::getTableValues(const String &tableName, const StringA
     sql = getSql(tableName, 1);
     if (sql.isNullOrEmpty()) {
         sql = filter.toSelectSql(name, colNames.toString(','));
+    } else {
+        sql = updateSql(filter, sql);
     }
 
     if (_logSqlInfo) {
@@ -130,6 +144,8 @@ FetchResult ExcDbProvider::getTableValues(const String &tableName, const StringA
         sql = getSql(tableName, 2);
         if (sql.isNullOrEmpty()) {
             sql = filter.toCountSql(name);
+        } else {
+            sql = updateSql(filter, sql);
         }
 
         if (_logSqlInfo) {
