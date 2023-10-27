@@ -66,9 +66,8 @@ String TaskFile::fileName() const {
 }
 
 bool TaskFile::getTask(const String &name, Crontab &crontab) {
-    rescan();
-
     Locker locker(&_properties);
+    rescan();
     for (int i = 0; i < MaxTaskCount; i++) {
         Crontab task;
         if (!Crontab::parse(_properties, i, task)) {
@@ -83,15 +82,12 @@ bool TaskFile::getTask(const String &name, Crontab &crontab) {
 }
 
 bool TaskFile::getTask(int pos, Crontab &crontab) {
-    rescan();
-
     Locker locker(&_properties);
+    rescan();
     return Crontab::parse(_properties, pos, crontab);
 }
 
 bool TaskFile::getTasks(const SqlSelectFilter &filter, DataTable &table) {
-    rescan();
-
     Locker locker(&_properties);
 //    const YmlNode::Properties &props = _properties;
 //    for (auto it = props.begin(); it != props.end(); ++it) {
@@ -99,6 +95,8 @@ bool TaskFile::getTasks(const SqlSelectFilter &filter, DataTable &table) {
 //        const String &value = it.value();
 //        Trace::info(String::format("%s=%s", key.c_str(), value.c_str()));
 //    }
+
+    rescan();
 
     Crontabs match;
     String name = filter.getValue("name");
@@ -239,7 +237,7 @@ bool TaskFile::saveFile(const YmlNode::Properties &properties) {
         File::getModifyTime(fileName, _modifyTime);
         return true;
     }
-    return true;
+    return false;
 }
 
 TaskDatabase::TaskDatabase() : _connection(nullptr) {
