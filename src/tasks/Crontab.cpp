@@ -495,3 +495,10 @@ bool Crontab::parseResult(const String &str, StringArray &results) {
 String Crontab::getTableName(const String &prefix, const String &tableName) {
     return prefix.isNullOrEmpty() ? tableName : String::format("%s.%s", prefix.c_str(), tableName.c_str());
 }
+
+void Crontab::addParam(const String &param) {
+    if (_execution != nullptr) {
+        String newParam = String::format("%s %s", _execution->param().c_str(), param.c_str());
+        _execution->setParam(newParam);
+    }
+}

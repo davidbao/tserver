@@ -253,6 +253,7 @@ FetchResult ExcDbProvider::execButton(const String &buttonName, const StringMap 
             }
 
             // Invoke an execution.
+            crontab.addParam(UInt64(id).toString());
             crontab.execute();
 
             // Retrieve the results.

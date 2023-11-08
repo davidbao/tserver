@@ -25,7 +25,8 @@ using namespace Crypto;
 Execution::Execution() : _sync(true), _timeout(TimeSpan::Zero) {
 }
 
-Execution::Execution(bool sync, const TimeSpan &timeout) : _sync(sync), _timeout(timeout) {
+Execution::Execution(bool sync, const TimeSpan &timeout, const String &param) : _sync(sync), _timeout(timeout),
+                                                                                _param(param) {
 }
 
 bool Execution::equals(const Execution &other) const {
@@ -74,9 +75,17 @@ String Execution::toString() const {
     return toJsonNode().toString();
 }
 
+const String &Execution::param() const {
+    return _param;
+}
+
+void Execution::setParam(const String &param) {
+    _param = param;
+}
+
 AppExecution::AppExecution(bool sync, const TimeSpan &timeout,
                            const String &app, const String &param) :
-        Execution(sync, timeout), _app(app), _param(param) {
+        Execution(sync, timeout, param), _app(app) {
 }
 
 bool AppExecution::equals(const Execution &other) const {
@@ -108,10 +117,6 @@ String AppExecution::type() const {
 
 const String &AppExecution::app() const {
     return _app;
-}
-
-const String &AppExecution::param() const {
-    return _param;
 }
 
 Execution::Result AppExecution::execute() {
@@ -276,7 +281,7 @@ PythonExecution::PythonExecution(bool sync, const TimeSpan &timeout, const Strin
 }
 
 PythonExecution::PythonExecution(bool sync, const TimeSpan &timeout, const String &fileName, const String &param) :
-        Execution(sync, timeout), _fileName(fileName), _param(param) {
+        Execution(sync, timeout, param), _fileName(fileName) {
 }
 
 bool PythonExecution::equals(const Execution &other) const {
@@ -313,10 +318,6 @@ const String &PythonExecution::script() const {
 
 const String &PythonExecution::fileName() const {
     return _fileName;
-}
-
-const String &PythonExecution::param() const {
-    return _param;
 }
 
 bool PythonExecution::isFile() const {

@@ -36,7 +36,7 @@ public:
 
     Execution();
 
-    explicit Execution(bool sync, const TimeSpan &timeout);
+    explicit Execution(bool sync, const TimeSpan &timeout, const String &param = String::Empty);
 
     bool equals(const Execution &other) const override;
 
@@ -62,9 +62,14 @@ public:
 
     String toString() const;
 
+    const String &param() const;
+
+    void setParam(const String &param);
+
 protected:
     bool _sync;
     TimeSpan _timeout;
+    String _param;
 };
 
 class AppExecution : public Execution {
@@ -86,8 +91,6 @@ public:
 
     const String &app() const;
 
-    const String &param() const;
-
     Result execute() override;
 
     JsonNode toJsonNode() const override;
@@ -97,7 +100,6 @@ protected:
 
 private:
     String _app;
-    String _param;
 };
 
 class SqlExecution : public Execution {
@@ -159,8 +161,6 @@ public:
 
     const String &fileName() const;
 
-    const String &param() const;
-
     bool isFile() const;
 
     Result execute() override;
@@ -174,7 +174,6 @@ private:
     String _script;
 
     String _fileName;
-    String _param;
 };
 
 #endif //TSERVER_EXECUTION_H

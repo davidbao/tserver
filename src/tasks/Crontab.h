@@ -71,6 +71,8 @@ public:
 
     String toReplaceSqlStr(const String &prefix) const;
 
+    void addParam(const String &param);
+
 public:
     static bool parse(const StringMap &request, Crontab &crontab);
 
