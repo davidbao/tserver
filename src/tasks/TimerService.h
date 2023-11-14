@@ -30,11 +30,14 @@ private:
 
     void cronTimeUp();
 
+    bool getTask(int pos, Crontab &crontab);
+
 private:
     Timer *_cycleTimer;
     Timer *_cronTimer;
 
     ITaskStorage *_storage;
+    Mutex _storageMutex;
 };
 
 

@@ -21,7 +21,9 @@ TimerService::~TimerService() {
 }
 
 bool TimerService::initialize(ITaskStorage *storage) {
+    _storageMutex.lock();
     _storage = storage;
+    _storageMutex.unlock();
 
     if (_cycleTimer == nullptr) {
         static const TimeSpan interval = TimeSpan::fromMilliseconds(500);
@@ -41,6 +43,10 @@ bool TimerService::unInitialize() {
     delete _cronTimer;
     _cronTimer = nullptr;
 
+    _storageMutex.lock();
+    _storage = nullptr;
+    _storageMutex.unlock();
+
     return true;
 }
 
@@ -48,7 +54,7 @@ void TimerService::cycleTimeUp() {
     if (_storage != nullptr) {
         for (int i = 0; i < MaxTaskCount; i++) {
             Crontab crontab;
-            if (_storage->getTask(i, crontab)) {
+            if (getTask(i, crontab)) {
                 auto cs = dynamic_cast<const CycleSchedule*>(crontab.schedule());
                 if (cs != nullptr) {
                     if (crontab.isTimeUp()) {
@@ -64,7 +70,7 @@ void TimerService::cronTimeUp() {
     if (_storage != nullptr) {
         for (int i = 0; i < MaxTaskCount; i++) {
             Crontab crontab;
-            if (_storage->getTask(i, crontab)) {
+            if (getTask(i, crontab)) {
                 auto cs = dynamic_cast<const CronSchedule*>(crontab.schedule());
                 if (cs != nullptr) {
                     if (crontab.isTimeUp()) {
@@ -74,4 +80,9 @@ void TimerService::cronTimeUp() {
             }
         }
     }
+}
+
+bool TimerService::getTask(int pos, Crontab &crontab) {
+    Locker locker(&_storageMutex);
+    return _storage != nullptr && _storage->getTask(pos, crontab);
 }
