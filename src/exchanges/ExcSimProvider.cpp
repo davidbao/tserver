@@ -29,7 +29,7 @@ ExcSimProvider::ExcSimProvider() : _storage(nullptr) {
     assert(cs);
 
     String type;
-    cs->getProperty("summer.exchange.type", type);
+    cs->getProperty(ExcPrefix "type", type);
     if (String::equals(type, "simulator", true)) {
         // It's a simulator, so do initialization.
         _cache = new ExcSimCacheMemory();

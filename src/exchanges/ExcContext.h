@@ -36,6 +36,11 @@ enum FetchResult {
 };
 
 #define ExcPrefix "summer.exchange."
+#define DatabasePrefix ExcPrefix "database."
+#define SimulatorPrefix ExcPrefix "simulator."
+
+#define MaxLabelCount 1000
+#define MaxTableCount 1000
 
 class IExcProvider {
 public:

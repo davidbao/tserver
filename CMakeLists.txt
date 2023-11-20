@@ -22,7 +22,9 @@ option(TSERVER_BUILD_MYSQL_STATIC "Option for build with mysql static lib" ON)
 option(TSERVER_BUILD_ORACLE "Option for build with oracle" OFF)
 option(TSERVER_BUILD_KINGBASE "Option for build with Kingbase" OFF)
 option(TSERVER_BUILD_DM6 "Option for build with dm6" OFF)
+option(TSERVER_BUILD_DM6_STATIC "Option for build with dm6 static lib" ON)
 option(TSERVER_BUILD_DM7 "Option for build with dm7" OFF)
+option(TSERVER_BUILD_DM7_STATIC "Option for build with dm7 static lib" ON)
 option(TSERVER_BUILD_MQTTCLIENT "Option for build with mqtt client(use paho.mqtt.c)" ON)
 
 ## build settings

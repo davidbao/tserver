@@ -66,12 +66,14 @@ public:
     bool removeTask(const StringMap &request, StringMap &response) override;
 
 private:
+    SqlConnection *connection();
+
     bool getTaskId(const String &name, uint64_t &id);
 
     bool containsTask(const String &name);
 
 private:
-    static String getTablePrefix();
+    static String getScheme();
 
     static String getTableName(const String &tableName);
 

@@ -146,6 +146,7 @@ endif ()
 set(MAIN_SRC main.cpp AppStarter.cpp AdminService.cpp ExcService.cpp Style.cpp TaskService.cpp WebService.cpp)
 set(EXCHANGE_SRC exchanges/ExcContext.cpp
         exchanges/ExcDbProvider.cpp
+        exchanges/ExcDbSqlStorage.cpp
         exchanges/ExcSimCache.cpp
         exchanges/ExcSimContext.cpp
         exchanges/ExcSimStorage.cpp

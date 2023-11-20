@@ -22,16 +22,13 @@ using namespace Database;
 using namespace System;
 
 // for application.yml
-#define SimulatorPrefix ExcPrefix "simulator."
 #define SimDbPrefix SimulatorPrefix "database."
 
 // for yml file.
-#define MaxLabelCount 1000
 #define LabelPrefix "labels[%d]."
 #define MaxTagCount 1000
 #define TagPrefix LabelPrefix "tags[%d]."
 
-#define MaxTableCount 1000
 #define TablePrefix "tables[%d]."
 #define MaxColumnCount 100
 #define ColumnPrefix TablePrefix "columns[%d]."

@@ -108,6 +108,8 @@ public:
     bool removeButton(const StringMap &request, StringMap &response) override;
 
 private:
+    SqlConnection *connection();
+
     bool getLabelId(const String &name, uint64_t &id);
 
     bool containsLabel(const String &name);
@@ -121,7 +123,7 @@ private:
     bool containsButton(const String &name);
 
 private:
-    static String getTablePrefix();
+    static String getScheme();
 
     static String getTableName(const String &tableName);
 

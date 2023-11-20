@@ -20,7 +20,7 @@
 using namespace Config;
 using namespace Microservice;
 
-ExcDbProvider::ExcDbProvider() {
+ExcDbProvider::ExcDbProvider() : _storage(nullptr) {
     Trace::info("The exchange type is database.");
 
     ServiceFactory *factory = ServiceFactory::instance();
@@ -30,9 +30,14 @@ ExcDbProvider::ExcDbProvider() {
 
     _logSqlInfo = false;
     cs->getProperty(LogPrefix "sqlEnable", _logSqlInfo);
+
+    loadData();
 }
 
-ExcDbProvider::~ExcDbProvider() = default;
+ExcDbProvider::~ExcDbProvider() {
+    delete _storage;
+    _storage = nullptr;
+}
 
 SqlConnection *ExcDbProvider::connection() const {
     ServiceFactory *factory = ServiceFactory::instance();
@@ -51,13 +56,15 @@ void ExcDbProvider::createSqlFile(const String &fileName, const String &sql) {
 }
 
 String ExcDbProvider::updateSql(const SqlSelectFilter &filter, const String &sql) {
-    String str = sql;
+    String str = sql.toUpper();
     const StringMap &values = filter.values();
     for (auto it = values.begin(); it != values.end(); ++it) {
-        const String &k = it.key();
+        String k = it.key().toUpper();
         const String &v = it.value();
         str = str.replace(String::format("$%s", k.c_str()), v);
     }
+    str = str.replace("$LIMIT", Int32(filter.limit()).toString());
+    str = str.replace("$OFFSET", Int32(filter.offset()).toString());
     return str;
 }
 
@@ -67,11 +74,12 @@ FetchResult ExcDbProvider::getLabelValues(const String &labelName, const StringA
     if (connection == nullptr)
         return FetchResult::DbError;
 
+    String scheme = getScheme();
+    String name = scheme.isNullOrEmpty() ? labelName : String::format("%s.%s", scheme.c_str(), labelName.c_str());
+
     String sql;
-    sql = getSql(labelName, 0);
+    sql = getSql(labelName, LabelSql);
     if (sql.isNullOrEmpty()) {
-        String prefix = getTablePrefix();
-        String name = prefix.isNullOrEmpty() ? labelName : String::format("%s.%s", prefix.c_str(), labelName.c_str());
         sql = filter.toSelectSql(name, tagNames.toString(','));
     } else {
         sql = updateSql(filter, sql);
@@ -125,11 +133,11 @@ FetchResult ExcDbProvider::getTableValues(const String &tableName, const StringA
     if (connection == nullptr)
         return FetchResult::DbError;
 
-    String prefix = getTablePrefix();
-    String name = prefix.isNullOrEmpty() ? tableName : String::format("%s.%s", prefix.c_str(), tableName.c_str());
+    String scheme = getScheme();
+    String name = scheme.isNullOrEmpty() ? tableName : String::format("%s.%s", scheme.c_str(), tableName.c_str());
 
     String sql;
-    sql = getSql(tableName, 1);
+    sql = getSql(tableName, TableQuerySql);
     if (sql.isNullOrEmpty()) {
         sql = filter.toSelectSql(name, colNames.toString(','));
     } else {
@@ -141,7 +149,7 @@ FetchResult ExcDbProvider::getTableValues(const String &tableName, const StringA
     }
 
     if (connection->executeSqlQuery(sql, table)) {
-        sql = getSql(tableName, 2);
+        sql = getSql(tableName, TableCountSql);
         if (sql.isNullOrEmpty()) {
             sql = filter.toCountSql(name);
         } else {
@@ -187,10 +195,10 @@ FetchResult ExcDbProvider::execButton(const String &buttonName, const StringMap 
                     other.add(operationUserStr, DbValue::NullValue);
                 }
 
-                String prefix = getTablePrefix();
-                String tableName = prefix.isNullOrEmpty() ?
+                String scheme = getScheme();
+                String tableName = scheme.isNullOrEmpty() ?
                                    buttonName :
-                                   String::format("%s.%s", prefix.c_str(), buttonName.c_str());
+                                   String::format("%s.%s", scheme.c_str(), buttonName.c_str());
                 DataTable table(tableName);
                 table.addColumn(DataColumn(idStr, DbType::Integer64, true));
                 for (auto it = other.begin(); it != other.end(); ++it) {
@@ -212,10 +220,10 @@ FetchResult ExcDbProvider::execButton(const String &buttonName, const StringMap 
             auto retrieveResult = [](SqlConnection *connection, const String &buttonName, const StringMap &params,
                                      uint64_t id, VariantMap &results) {
                 DataTable table;
-                String prefix = getTablePrefix();
-                String tableName = prefix.isNullOrEmpty() ?
+                String scheme = getScheme();
+                String tableName = scheme.isNullOrEmpty() ?
                                    buttonName :
-                                   String::format("%s.%s", prefix.c_str(), buttonName.c_str());
+                                   String::format("%s.%s", scheme.c_str(), buttonName.c_str());
                 String sql = String::format("SELECT * FROM %s WHERE ID=%" PRIu64, tableName.c_str(), id);
                 if (connection->executeSqlQuery(sql, table) && table.rowCount() == 1) {
                     const DataCells &cells = table.rows()[0].cells();
@@ -233,10 +241,10 @@ FetchResult ExcDbProvider::execButton(const String &buttonName, const StringMap 
                 return false;
             };
             auto cleanRecords = [](SqlConnection *connection, const String &buttonName) {
-                String prefix = getTablePrefix();
-                String tableName = prefix.isNullOrEmpty() ?
+                String scheme = getScheme();
+                String tableName = scheme.isNullOrEmpty() ?
                                    buttonName :
-                                   String::format("%s.%s", prefix.c_str(), buttonName.c_str());
+                                   String::format("%s.%s", scheme.c_str(), buttonName.c_str());
                 DateTime time = DateTime::now().date().addDays(-7);
                 String sql = String::format("DELETE FROM %s WHERE OPERATION_TIME<='%s'",
                                             tableName.c_str(), time.toString().c_str());
@@ -266,76 +274,40 @@ FetchResult ExcDbProvider::execButton(const String &buttonName, const StringMap 
     return FetchResult::ExecFailed;
 }
 
-String ExcDbProvider::getSqlFileName(const String &name, int sqlIndex) {
+String ExcDbProvider::getSql(const String &name, ExcSqlType type) {
+    if (_storage != nullptr) {
+        return _storage->getSql(name, type);
+    }
+    return String::Empty;
+}
+
+String ExcDbProvider::getScheme() {
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
     auto *cs = factory->getService<IConfigService>();
     assert(cs);
 
-    String subPath;
-    cs->getProperty(DatabasePrefix "path", subPath);
-
-    String sqlFileName;
-    if (sqlIndex == 0) {
-        for (int i = 0; i < MaxLabelCount; i++) {
-            String n;
-            if (!cs->getProperty(String::format(DbLabelPrefix "name", i), n)) {
-                break;
-            }
-            if (name == n) {
-                if (cs->getProperty(String::format(DbLabelPrefix "sql", i), sqlFileName)) {
-                    break;
-                }
-            }
-        }
-    } else {
-        for (int i = 0; i < MaxTableCount; i++) {
-            String n;
-            if (!cs->getProperty(String::format(DbTablePrefix "name", i), n)) {
-                break;
-            }
-            if (name == n) {
-                const char *fmt = sqlIndex == 1 ? (DbTablePrefix "querySql") : (DbTablePrefix "countSql");
-                if (cs->getProperty(String::format(fmt, i), sqlFileName)) {
-                    break;
-                }
-            }
-        }
+    String scheme;
+    if (!cs->getProperty(DatabasePrefix "scheme", scheme)) {
+        cs->getProperty(DatabasePrefix "table.prefix", scheme);   // for compatibility
     }
-
-    const String appPath = Path::getAppPath();
-    String fileName = Path::combine(Path::combine(appPath, subPath), sqlFileName);
-    if (File::exists(fileName)) {
-        return fileName;
-    } else {
-        Application *app = Application::instance();
-        assert(app);
-        fileName = Path::combine(Path::combine(app->rootPath(), subPath), sqlFileName);
-        if (File::exists(fileName)) {
-            return fileName;
-        }
-    }
-    return String::Empty;
+    return scheme;
 }
 
-String ExcDbProvider::getSql(const String &name, int sqlIndex) {
-    String fileName = getSqlFileName(name, sqlIndex);
-    if (File::exists(fileName)) {
-        FileStream fs(fileName, FileMode::FileOpenWithoutException, FileAccess::FileRead);
-        String sql;
-        fs.readToEnd(sql);
-        return sql;
-    }
-    return String::Empty;
-}
-
-String ExcDbProvider::getTablePrefix() {
+bool ExcDbProvider::loadData() {
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
     auto *cs = factory->getService<IConfigService>();
     assert(cs);
 
-    String prefix;
-    cs->getProperty(DatabasePrefix "table.prefix", prefix);
-    return prefix;
+    String type;
+    cs->getProperty(SqlPrefix "type", type);
+    if (String::equals(type, "file", true)) {
+        Trace::info("Load sql from file.");
+        _storage = new ExcDbSqlFile();
+    } else if (String::equals(type, "database", true)) {
+        Trace::info("Load sql from database.");
+        _storage = new ExcDbSqlDatabase();
+    }
+    return _storage != nullptr && _storage->load();
 }
