@@ -165,20 +165,20 @@ FetchResult ExcService::getTableValues(const JsonNode &request, JsonNode &respon
                 StringArray columns;
                 node.getAttribute("columns", columns);
                 SqlSelectFilter filter;
-                if (SqlSelectFilter::parse(node["condition"].toString(), filter)) {
-                    DataTable table("rows");
-                    FetchResult result = provider->getTableValues(name, columns, filter, table);
-                    JsonNode iNode("item");
-                    iNode.add(JsonNode("name", name));
-                    iNode.add(JsonNode("errorCode", (int) result));
-                    if (result == FetchResult::Succeed) {
-                        iNode.add(JsonNode("pageNo", filter.page()));
-                        iNode.add(JsonNode("pageSize", filter.pageSize()));
-                        int pageCount = filter.pageSize() > 0 ?
-                                        (table.totalCount() / filter.pageSize() + (
-                                                table.totalCount() % filter.pageSize() == 0 ? 0 : 1)) : 0;
-                        iNode.add(JsonNode("pageCount", pageCount));
-                        iNode.add(JsonNode("totalCount", table.totalCount()));
+                SqlSelectFilter::parse(node["condition"].toString(), filter);
+                DataTable table("rows");
+                FetchResult result = provider->getTableValues(name, columns, filter, table);
+                JsonNode iNode("item");
+                iNode.add(JsonNode("name", name));
+                iNode.add(JsonNode("errorCode", (int) result));
+                if (result == FetchResult::Succeed) {
+                    iNode.add(JsonNode("pageNo", filter.page()));
+                    iNode.add(JsonNode("pageSize", filter.pageSize()));
+                    int pageCount = filter.pageSize() > 0 ?
+                                    (table.totalCount() / filter.pageSize() + (
+                                            table.totalCount() % filter.pageSize() == 0 ? 0 : 1)) : 0;
+                    iNode.add(JsonNode("pageCount", pageCount));
+                    iNode.add(JsonNode("totalCount", table.totalCount()));
 
 //                        if (ignoreCase) {
 //                            for (size_t j = 0; j < table.columnCount(); ++j) {
@@ -186,12 +186,11 @@ FetchResult ExcService::getTableValues(const JsonNode &request, JsonNode &respon
 //                                if (String::equals(column.name(), tags))
 //                            }
 //                        }
-                        JsonNode dataNode;
-                        table.toJsonNode(dataNode, responseStyle == "string" ? "cs" : "cn");
-                        iNode.add(dataNode);
-                    }
-                    tNode.add(iNode);
+                    JsonNode dataNode;
+                    table.toJsonNode(dataNode, responseStyle == "string" ? "cs" : "cn");
+                    iNode.add(dataNode);
                 }
+                tNode.add(iNode);
             }
             response = tNode;
 

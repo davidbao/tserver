@@ -73,7 +73,7 @@ private:
     bool containsTask(const String &name);
 
 private:
-    static String getScheme();
+    static String getSchema();
 
     static String getTableName(const String &tableName);
 

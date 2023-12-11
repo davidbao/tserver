@@ -282,7 +282,7 @@ bool TaskDatabase::getTask(const String &name, Crontab &crontab) {
     SqlConnection *connection = this->connection();
     if (connection != nullptr) {
         if (connection->isConnected()) {
-            String sql = Crontab::toSelectSqlStr(getScheme(), name);
+            String sql = Crontab::toSelectSqlStr(getSchema(), name);
             DataTable dataTable(TaskTableName);
             if (connection->executeSqlQuery(sql, dataTable) && dataTable.rowCount() == 1) {
                 const DataRow &row = dataTable.rows()[0];
@@ -297,7 +297,7 @@ bool TaskDatabase::getTask(int pos, Crontab &crontab) {
     SqlConnection *connection = this->connection();
     if (connection != nullptr) {
         if (connection->isConnected()) {
-            String sql = Crontab::toSelectSqlStr(getScheme(), pos);
+            String sql = Crontab::toSelectSqlStr(getSchema(), pos);
             DataTable dataTable(TaskTableName);
             if (connection->executeSqlQuery(sql, dataTable) && dataTable.rowCount() == 1) {
                 const DataRow &row = dataTable.rows()[0];
@@ -313,9 +313,9 @@ bool TaskDatabase::getTasks(const SqlSelectFilter &filter, DataTable &table) {
     if (connection != nullptr) {
         if (connection->isConnected()) {
             String sql;
-            sql = Crontab::toSelectSqlStr(getScheme(), filter);
+            sql = Crontab::toSelectSqlStr(getSchema(), filter);
             if (connection->executeSqlQuery(sql, table)) {
-                sql = Crontab::toCountSqlStr(getScheme(), filter);
+                sql = Crontab::toCountSqlStr(getSchema(), filter);
                 int totalCount = 0;
                 if (connection->retrieveCount(sql, totalCount))
                     table.setTotalCount(totalCount);
@@ -345,7 +345,7 @@ bool TaskDatabase::addTask(const StringMap &request, StringMap &response) {
             }
 
             // insert crontab record.
-            String sql = crontab.toInsertSqlStr(getScheme());
+            String sql = crontab.toInsertSqlStr(getSchema());
             if (!connection->executeSql(sql)) {
                 // Simulator database error.
                 response.addRange(HttpCode::at(SimulatorDbError));
@@ -379,7 +379,7 @@ bool TaskDatabase::updateTask(const StringMap &request, StringMap &response) {
             }
 
             // replace task record.
-            String sql = task.toReplaceSqlStr(getScheme());
+            String sql = task.toReplaceSqlStr(getSchema());
             if (!connection->executeSql(sql)) {
                 // Simulator database error.
                 response.addRange(HttpCode::at(SimulatorDbError));
@@ -409,7 +409,7 @@ bool TaskDatabase::removeTask(const StringMap &request, StringMap &response) {
                 Crontab crontab;
                 if (getTask(name, crontab)) {
                     if (crontab.enable && names.contains(crontab.name)) {
-                        sql.appendLine(Crontab::toDeleteSqlStr(getScheme(), name));
+                        sql.appendLine(Crontab::toDeleteSqlStr(getSchema(), name));
                         crontab.removeFile();
                     }
                 }
@@ -449,20 +449,20 @@ bool TaskDatabase::containsTask(const String &name) {
     return getTaskId(name, id);
 }
 
-String TaskDatabase::getScheme() {
+String TaskDatabase::getSchema() {
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
     auto *cs = factory->getService<IConfigService>();
     assert(cs);
 
-    String scheme;
-    if (!cs->getProperty(TaskDbPrefix "scheme", scheme)) {
-        cs->getProperty(TaskDbPrefix "table.prefix", scheme);   // for compatibility
+    String schema;
+    if (!cs->getProperty(TaskDbPrefix "schema", schema)) {
+        cs->getProperty(TaskDbPrefix "table.prefix", schema);   // for compatibility
     }
-    return scheme;
+    return schema;
 }
 
 String TaskDatabase::getTableName(const String &tableName) {
-    String scheme = getScheme();
-    return scheme.isNullOrEmpty() ? tableName : String::format("%s.%s", scheme.c_str(), tableName.c_str());
+    String schema = getSchema();
+    return schema.isNullOrEmpty() ? tableName : String::format("%s.%s", schema.c_str(), tableName.c_str());
 }

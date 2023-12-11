@@ -41,7 +41,7 @@ private:
 
     String getSql(const String &name, ExcSqlType type);
 
-    static String getScheme();
+    static String getSchema();
 
     static String updateSql(const SqlSelectFilter &filter, const String &sql);
 

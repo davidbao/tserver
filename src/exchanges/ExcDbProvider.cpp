@@ -74,8 +74,8 @@ FetchResult ExcDbProvider::getLabelValues(const String &labelName, const StringA
     if (connection == nullptr)
         return FetchResult::DbError;
 
-    String scheme = getScheme();
-    String name = scheme.isNullOrEmpty() ? labelName : String::format("%s.%s", scheme.c_str(), labelName.c_str());
+    String schema = getSchema();
+    String name = schema.isNullOrEmpty() ? labelName : String::format("%s.%s", schema.c_str(), labelName.c_str());
 
     String sql;
     sql = getSql(labelName, LabelSql);
@@ -133,8 +133,8 @@ FetchResult ExcDbProvider::getTableValues(const String &tableName, const StringA
     if (connection == nullptr)
         return FetchResult::DbError;
 
-    String scheme = getScheme();
-    String name = scheme.isNullOrEmpty() ? tableName : String::format("%s.%s", scheme.c_str(), tableName.c_str());
+    String schema = getSchema();
+    String name = schema.isNullOrEmpty() ? tableName : String::format("%s.%s", schema.c_str(), tableName.c_str());
 
     String sql;
     sql = getSql(tableName, TableQuerySql);
@@ -195,10 +195,10 @@ FetchResult ExcDbProvider::execButton(const String &buttonName, const StringMap 
                     other.add(operationUserStr, DbValue::NullValue);
                 }
 
-                String scheme = getScheme();
-                String tableName = scheme.isNullOrEmpty() ?
+                String schema = getSchema();
+                String tableName = schema.isNullOrEmpty() ?
                                    buttonName :
-                                   String::format("%s.%s", scheme.c_str(), buttonName.c_str());
+                                   String::format("%s.%s", schema.c_str(), buttonName.c_str());
                 DataTable table(tableName);
                 table.addColumn(DataColumn(idStr, DbType::Integer64, true));
                 for (auto it = other.begin(); it != other.end(); ++it) {
@@ -220,10 +220,10 @@ FetchResult ExcDbProvider::execButton(const String &buttonName, const StringMap 
             auto retrieveResult = [](SqlConnection *connection, const String &buttonName, const StringMap &params,
                                      uint64_t id, VariantMap &results) {
                 DataTable table;
-                String scheme = getScheme();
-                String tableName = scheme.isNullOrEmpty() ?
+                String schema = getSchema();
+                String tableName = schema.isNullOrEmpty() ?
                                    buttonName :
-                                   String::format("%s.%s", scheme.c_str(), buttonName.c_str());
+                                   String::format("%s.%s", schema.c_str(), buttonName.c_str());
                 String sql = String::format("SELECT * FROM %s WHERE ID=%" PRIu64, tableName.c_str(), id);
                 if (connection->executeSqlQuery(sql, table) && table.rowCount() == 1) {
                     const DataCells &cells = table.rows()[0].cells();
@@ -241,10 +241,10 @@ FetchResult ExcDbProvider::execButton(const String &buttonName, const StringMap 
                 return false;
             };
             auto cleanRecords = [](SqlConnection *connection, const String &buttonName) {
-                String scheme = getScheme();
-                String tableName = scheme.isNullOrEmpty() ?
+                String schema = getSchema();
+                String tableName = schema.isNullOrEmpty() ?
                                    buttonName :
-                                   String::format("%s.%s", scheme.c_str(), buttonName.c_str());
+                                   String::format("%s.%s", schema.c_str(), buttonName.c_str());
                 DateTime time = DateTime::now().date().addDays(-7);
                 String sql = String::format("DELETE FROM %s WHERE OPERATION_TIME<='%s'",
                                             tableName.c_str(), time.toString().c_str());
@@ -281,17 +281,17 @@ String ExcDbProvider::getSql(const String &name, ExcSqlType type) {
     return String::Empty;
 }
 
-String ExcDbProvider::getScheme() {
+String ExcDbProvider::getSchema() {
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
     auto *cs = factory->getService<IConfigService>();
     assert(cs);
 
-    String scheme;
-    if (!cs->getProperty(DatabasePrefix "scheme", scheme)) {
-        cs->getProperty(DatabasePrefix "table.prefix", scheme);   // for compatibility
+    String schema;
+    if (!cs->getProperty(DatabasePrefix "schema", schema)) {
+        cs->getProperty(DatabasePrefix "table.prefix", schema);   // for compatibility
     }
-    return scheme;
+    return schema;
 }
 
 bool ExcDbProvider::loadData() {

@@ -595,7 +595,7 @@ bool ExcSimDatabase::getLabel(const String &name, Label &label) {
     SqlConnection *connection = this->connection();
     if (connection != nullptr) {
         if (connection->isConnected()) {
-            String sql = Label::toSelectSqlStr(getScheme(), name);
+            String sql = Label::toSelectSqlStr(getSchema(), name);
             DataTable dataTable(LabelTableName);
             if (connection->executeSqlQuery(sql, dataTable) && dataTable.rowCount() == 1) {
                 const DataRow &row = dataTable.rows()[0];
@@ -611,9 +611,9 @@ bool ExcSimDatabase::getLabels(const SqlSelectFilter &filter, DataTable &table) 
     if (connection != nullptr) {
         if (connection->isConnected()) {
             String sql;
-            sql = Label::toSelectSqlStr(getScheme(), filter);
+            sql = Label::toSelectSqlStr(getSchema(), filter);
             if (connection->executeSqlQuery(sql, table)) {
-                sql = Label::toCountSqlStr(getScheme(), filter);
+                sql = Label::toCountSqlStr(getSchema(), filter);
                 int totalCount = 0;
                 if (connection->retrieveCount(sql, totalCount))
                     table.setTotalCount(totalCount);
@@ -643,7 +643,7 @@ bool ExcSimDatabase::addLabel(const StringMap &request, StringMap &response) {
             }
 
             // insert label record.
-            String sql = label.toInsertSqlStr(getScheme());
+            String sql = label.toInsertSqlStr(getSchema());
             if (!connection->executeSql(sql)) {
                 // Simulator database error.
                 response.addRange(HttpCode::at(SimulatorDbError));
@@ -677,7 +677,7 @@ bool ExcSimDatabase::updateLabel(const StringMap &request, StringMap &response) 
             }
 
             // replace label record.
-            String sql = label.toReplaceSqlStr(getScheme());
+            String sql = label.toReplaceSqlStr(getSchema());
             if (!connection->executeSql(sql)) {
                 // Simulator database error.
                 response.addRange(HttpCode::at(SimulatorDbError));
@@ -702,7 +702,7 @@ bool ExcSimDatabase::removeLabel(const StringMap &request, StringMap &response) 
             // delete label record.
             String sql;
             for (size_t i = 0; i < names.count(); ++i) {
-                sql.appendLine(Label::toDeleteSqlStr(getScheme(), names[i]));
+                sql.appendLine(Label::toDeleteSqlStr(getSchema(), names[i]));
                 if (!connection->executeSql(sql)) {
                     // Simulator database error.
                     response.addRange(HttpCode::at(SimulatorDbError));
@@ -722,7 +722,7 @@ bool ExcSimDatabase::getTable(const String &name, Table &table) {
     SqlConnection *connection = this->connection();
     if (connection != nullptr) {
         if (connection->isConnected()) {
-            String sql = Table::toSelectSqlStr(getScheme(), name);
+            String sql = Table::toSelectSqlStr(getSchema(), name);
             DataTable dataTable(TableTableName);
             if (connection->executeSqlQuery(sql, dataTable) && dataTable.rowCount() == 1) {
                 const DataRow &row = dataTable.rows()[0];
@@ -738,9 +738,9 @@ bool ExcSimDatabase::getTables(const SqlSelectFilter &filter, DataTable &table) 
     if (connection != nullptr) {
         if (connection->isConnected()) {
             String sql;
-            sql = Table::toSelectSqlStr(getScheme(), filter);
+            sql = Table::toSelectSqlStr(getSchema(), filter);
             if (connection->executeSqlQuery(sql, table)) {
-                sql = Table::toCountSqlStr(getScheme(), filter);
+                sql = Table::toCountSqlStr(getSchema(), filter);
                 int totalCount = 0;
                 if (connection->retrieveCount(sql, totalCount))
                     table.setTotalCount(totalCount);
@@ -770,7 +770,7 @@ bool ExcSimDatabase::addTable(const StringMap &request, StringMap &response) {
             }
 
             // insert table record.
-            String sql = table.toInsertSqlStr(getScheme());
+            String sql = table.toInsertSqlStr(getSchema());
             if (!connection->executeSql(sql)) {
                 // Simulator database error.
                 response.addRange(HttpCode::at(SimulatorDbError));
@@ -804,7 +804,7 @@ bool ExcSimDatabase::updateTable(const StringMap &request, StringMap &response) 
             }
 
             // replace table record.
-            String sql = table.toReplaceSqlStr(getScheme());
+            String sql = table.toReplaceSqlStr(getSchema());
             if (!connection->executeSql(sql)) {
                 // Simulator database error.
                 response.addRange(HttpCode::at(SimulatorDbError));
@@ -829,7 +829,7 @@ bool ExcSimDatabase::removeTable(const StringMap &request, StringMap &response) 
             // delete table record.
             String sql;
             for (size_t i = 0; i < names.count(); ++i) {
-                sql.appendLine(Table::toDeleteSqlStr(getScheme(), names[i]));
+                sql.appendLine(Table::toDeleteSqlStr(getSchema(), names[i]));
                 if (!connection->executeSql(sql)) {
                     // Simulator database error.
                     response.addRange(HttpCode::at(SimulatorDbError));
@@ -849,7 +849,7 @@ bool ExcSimDatabase::getButton(const String &name, Button &button) {
     SqlConnection *connection = this->connection();
     if (connection != nullptr) {
         if (connection->isConnected()) {
-            String sql = Button::toSelectSqlStr(getScheme(), name);
+            String sql = Button::toSelectSqlStr(getSchema(), name);
             DataTable dataTable(ButtonTableName);
             if (connection->executeSqlQuery(sql, dataTable) && dataTable.rowCount() == 1) {
                 const DataRow &row = dataTable.rows()[0];
@@ -865,9 +865,9 @@ bool ExcSimDatabase::getButtons(const SqlSelectFilter &filter, DataTable &table)
     if (connection != nullptr) {
         if (connection->isConnected()) {
             String sql;
-            sql = Button::toSelectSqlStr(getScheme(), filter);
+            sql = Button::toSelectSqlStr(getSchema(), filter);
             if (connection->executeSqlQuery(sql, table)) {
-                sql = Button::toCountSqlStr(getScheme(), filter);
+                sql = Button::toCountSqlStr(getSchema(), filter);
                 int totalCount = 0;
                 if (connection->retrieveCount(sql, totalCount))
                     table.setTotalCount(totalCount);
@@ -897,7 +897,7 @@ bool ExcSimDatabase::addButton(const StringMap &request, StringMap &response) {
             }
 
             // insert button record.
-            String sql = button.toInsertSqlStr(getScheme());
+            String sql = button.toInsertSqlStr(getSchema());
             if (!connection->executeSql(sql)) {
                 // Simulator database error.
                 response.addRange(HttpCode::at(SimulatorDbError));
@@ -931,7 +931,7 @@ bool ExcSimDatabase::updateButton(const StringMap &request, StringMap &response)
             }
 
             // replace button record.
-            String sql = button.toReplaceSqlStr(getScheme());
+            String sql = button.toReplaceSqlStr(getSchema());
             if (!connection->executeSql(sql)) {
                 // Simulator database error.
                 response.addRange(HttpCode::at(SimulatorDbError));
@@ -956,7 +956,7 @@ bool ExcSimDatabase::removeButton(const StringMap &request, StringMap &response)
             // delete button record.
             String sql;
             for (size_t i = 0; i < names.count(); ++i) {
-                sql.appendLine(Button::toDeleteSqlStr(getScheme(), names[i]));
+                sql.appendLine(Button::toDeleteSqlStr(getSchema(), names[i]));
                 if (!connection->executeSql(sql)) {
                     // Simulator database error.
                     response.addRange(HttpCode::at(SimulatorDbError));
@@ -1032,20 +1032,20 @@ bool ExcSimDatabase::containsButton(const String &name) {
     return getButtonId(name, id);
 }
 
-String ExcSimDatabase::getScheme() {
+String ExcSimDatabase::getSchema() {
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
     auto *cs = factory->getService<IConfigService>();
     assert(cs);
 
-    String scheme;
-    if (!cs->getProperty(SimDbPrefix "scheme", scheme)) {
-        cs->getProperty(SimDbPrefix "table.prefix", scheme);   // for compatibility
+    String schema;
+    if (!cs->getProperty(SimDbPrefix "schema", schema)) {
+        cs->getProperty(SimDbPrefix "table.prefix", schema);   // for compatibility
     }
-    return scheme;
+    return schema;
 }
 
 String ExcSimDatabase::getTableName(const String &tableName) {
-    String scheme = getScheme();
-    return scheme.isNullOrEmpty() ? tableName : String::format("%s.%s", scheme.c_str(), tableName.c_str());
+    String schema = getSchema();
+    return schema.isNullOrEmpty() ? tableName : String::format("%s.%s", schema.c_str(), tableName.c_str());
 }
