@@ -454,3 +454,86 @@ err:
     }
     return true;
 }
+
+CountSchedule::CountSchedule() : CountSchedule(TimeSpan::Zero) {
+}
+
+CountSchedule::CountSchedule(const TimeSpan &interval, int count) : CycleSchedule(interval), _count(count) {
+}
+
+CountSchedule::CountSchedule(const CountSchedule &other)  : CycleSchedule(other), _count(0) {
+    CountSchedule::evaluates(other);
+}
+
+CountSchedule &CountSchedule::operator=(const CountSchedule &other) {
+    if (this != &other) {
+        CountSchedule::evaluates(other);
+    }
+    return *this;
+}
+
+bool CountSchedule::equals(const Schedule &other) const {
+    auto p = dynamic_cast<const CountSchedule *>(&other);
+    assert(p);
+    return CycleSchedule::equals(other) && _count == p->_count;
+}
+
+void CountSchedule::evaluates(const Schedule &other) {
+    auto p = dynamic_cast<const CountSchedule *>(&other);
+    assert(p);
+    CycleSchedule::evaluates(other);
+    _count = p->_count;
+}
+
+Schedule *CountSchedule::clone() const {
+    auto p = new CountSchedule();
+    p->evaluates(*this);
+    return p;
+}
+
+String CountSchedule::type() const {
+    return "count";
+}
+
+int CountSchedule::count() const {
+    return _count;
+}
+
+bool CountSchedule::isTimeUp(const String &taskName) {
+    bool result = CycleSchedule::isTimeUp(taskName);
+    if (result) {
+        ServiceFactory *factory = ServiceFactory::instance();
+        assert(factory);
+        auto tc = factory->getService<ITaskCache>();
+        if (tc == nullptr) {
+            return false;
+        }
+
+        const String key = String::format("%s.count.count", taskName.c_str());
+        String countStr = tc->getValue(key);
+        int count = 0;
+        if (!Int32::parse(countStr, count)) {
+            count = _count;
+        }
+        if (count <= 0) {
+            return false;
+        } else {
+            count--;
+            if (count < 0) {
+                count = 0;
+            }
+            tc->setValue(key, Int32(count).toString());
+            return true;
+        }
+    } else {
+        return false;
+    }
+}
+
+JsonNode CountSchedule::toJsonNode() const {
+    JsonNode node;
+    node.add(JsonNode("type", "count"));
+    node.add(JsonNode("interval", _interval));
+    node.add(JsonNode("count", _count));
+    return node;
+}

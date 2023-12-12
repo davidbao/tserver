@@ -64,7 +64,7 @@ public:
 
     JsonNode toJsonNode() const override;
 
-private:
+protected:
     TimeSpan _interval;
 };
 
@@ -124,6 +124,36 @@ private:
     CronLine _line;
 
     static const int FieldCount = 5;
+};
+
+class CountSchedule : public CycleSchedule {
+public:
+    explicit CountSchedule();
+
+    CountSchedule(const TimeSpan &interval, int count = 1);
+
+    CountSchedule(const CountSchedule &other);
+
+    CountSchedule &operator=(const CountSchedule &other);
+
+    ~CountSchedule() override = default;
+
+    bool equals(const Schedule &other) const override;
+
+    void evaluates(const Schedule &other) override;
+
+    Schedule *clone() const override;
+
+    String type() const override;
+
+    int count() const;
+
+    bool isTimeUp(const String &taskName) override;
+
+    JsonNode toJsonNode() const override;
+
+private:
+    int _count;
 };
 
 #endif //TSERVER_SCHEDULE_H

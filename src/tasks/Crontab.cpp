@@ -179,13 +179,18 @@ void Crontab::updateYmlProperties(YmlNode::Properties &properties, int pos) cons
         String type = _schedule->type();
         properties.add(String::format(SchedulePrefix "type", pos), type);
         if (type == "cycle") {
-            auto cycle = dynamic_cast<const CycleSchedule *>(_schedule);
-            assert(cycle);
-            properties.add(String::format(SchedulePrefix "interval", pos), cycle->interval());
+            auto schedule = dynamic_cast<const CycleSchedule *>(_schedule);
+            assert(schedule);
+            properties.add(String::format(SchedulePrefix "interval", pos), schedule->interval());
         } else if (type == "cron" || type == "crontab") {
-            auto crontab = dynamic_cast<const CronSchedule *>(_schedule);
-            assert(crontab);
-            properties.add(String::format(SchedulePrefix "field", pos), crontab->field());
+            auto schedule = dynamic_cast<const CronSchedule *>(_schedule);
+            assert(schedule);
+            properties.add(String::format(SchedulePrefix "field", pos), schedule->field());
+        } else if (type == "count") {
+            auto schedule = dynamic_cast<const CountSchedule *>(_schedule);
+            assert(schedule);
+            properties.add(String::format(SchedulePrefix "interval", pos), schedule->interval());
+            properties.add(String::format(SchedulePrefix "count", pos), schedule->count());
         }
     }
     {
@@ -276,6 +281,16 @@ bool Crontab::parse(const YmlNode::Properties &properties, int pos, Crontab &cro
                     crontab._schedule = new CronSchedule(schedule);
                 } else {
                     Trace::error(String::format("Task'%s' cron field is invalid.", name.c_str()));
+                }
+            } else if (type == "count") {
+                TimeSpan interval;
+                properties.at(String::format(SchedulePrefix "interval", pos), interval);
+                int count = 0;
+                properties.at(String::format(SchedulePrefix "count", pos), count);
+                if (interval != TimeSpan::Zero) {
+                    crontab._schedule = new CountSchedule(interval, count);
+                } else {
+                    Trace::error(String::format("Task'%s' count interval is invalid.", name.c_str()));
                 }
             } else {
 //                Trace::error(String::format("Can not find schedule type'%s'!", type.c_str()));
@@ -436,6 +451,17 @@ bool Crontab::parseSchedule(const String &str, Schedule *&schedule) {
                 schedule = new CronSchedule(s);
             } else {
                 Trace::error("Cron field is invalid.");
+            }
+        } else if (type == "cycle") {
+            TimeSpan interval;
+            scheduleNode.getAttribute("interval", interval);
+            int count;
+            scheduleNode.getAttribute("count", count);
+            if (interval != TimeSpan::Zero) {
+                schedule = new CountSchedule(interval, count);
+                return true;
+            } else {
+                Trace::error("Count interval is invalid.");
             }
         } else {
             Trace::error(String::format("Can not find schedule type'%s'!", type.c_str()));
