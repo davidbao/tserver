@@ -26,6 +26,13 @@ bool TaskFile::load() {
     Locker locker(&_properties);
     if (YmlNode::loadFile(fileName, _properties)) {
         File::getModifyTime(fileName, _modifyTime);
+
+//        const YmlNode::Properties &props = _properties;
+//        for (auto it = props.begin(); it != props.end(); ++it) {
+//            const String &key = it.key();
+//            const String &value = it.value();
+//            Trace::info(String::format("%s=%s", key.c_str(), value.c_str()));
+//        }
         return true;
     }
     return false;

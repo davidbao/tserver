@@ -21,6 +21,7 @@
 #include "tasks/Execution.h"
 #ifndef WIN32
 #include <sys/wait.h>
+#include <csignal>
 #endif
 
 using namespace IO;
@@ -38,10 +39,10 @@ TaskService::TaskService() : _storage(nullptr), _cache(nullptr) {
         int status;
         pid_t pid = wait(&status);
         if (pid > 0 && WIFEXITED(status)) {
-            Trace::verb(String::format("process %d exited, return value = %d", pid, WEXITSTATUS(status)));
+            Trace::verb(String::format("The child process'%d' exited, exit code: %d", pid, WEXITSTATUS(status)));
         }
     };
-    _cleanTimer = new Timer("clean.defunct.process", 30 * 1000, cleanDefunctFunc);
+    _cleanTimer = new Timer("clean.defunct.process", 3 * 1000, cleanDefunctFunc);
 #endif
 }
 
@@ -52,6 +53,10 @@ TaskService::~TaskService() {
 #ifndef WIN32
     delete _cleanTimer;
     _cleanTimer = nullptr;
+
+    // send SIGTERM to all child processes.
+    signal(SIGTERM, SIG_IGN);
+    kill(0, SIGTERM);
 #endif
 
     ServiceFactory *factory = ServiceFactory::instance();
@@ -75,6 +80,12 @@ bool TaskService::unInitialize() {
     _timerService.unInitialize();
 
     _dbService.unInitialize();
+
+    delete _cache;
+    _cache = nullptr;
+
+    delete _storage;
+    _storage = nullptr;
 
     return true;
 }

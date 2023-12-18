@@ -351,6 +351,7 @@ Execution::Result PythonExecution::execute() {
             process.setRedirectStdout(true);
             process.setWaitingTimeout(_timeout);
             bool r = Process::start(PythonApp, param, &process);
+            Trace::verb(String::format("Start a process'%d', param: '%s'.", process.id(), param.c_str()));
             Trace::info(process.stdoutStr());
             if (r) {
                 result = !process.exist() ? Execution::Succeed : Execution::Timeout;
@@ -358,8 +359,14 @@ Execution::Result PythonExecution::execute() {
                 result = Execution::FailedToStartProcess;
             }
         } else {
-            bool r = Process::start(PythonApp, String::format("%s &", param.c_str()));
-            result = r ? Execution::Succeed : Execution::FailedToStartProcess;
+            Process process;
+            bool r = Process::start(PythonApp, String::format("%s &", param.c_str()), &process);
+            Trace::verb(String::format("Start a process'%d', param: '%s'.", process.id(), param.c_str()));
+            if (r) {
+                result = Execution::Succeed;
+            } else {
+                result = Execution::FailedToStartProcess;
+            }
         }
         if (!_script.isNullOrEmpty()) {
             File::deleteFile(fileName);

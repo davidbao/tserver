@@ -100,7 +100,9 @@ bool Crontab::isTimeUp() {
 
 bool Crontab::execute() {
     if (_execution != nullptr) {
-        Trace::verb(String::format("Start to execute a task'%s'.", name.c_str()));
+        Trace::verb(String::format("Start to execute a %s task'%s'.",
+                                   _execution->sync() ? "sync" : "async",
+                                   name.c_str()));
         Stopwatch sw;
         Execution::Result result = _execution->execute();
         sw.stop(false);
