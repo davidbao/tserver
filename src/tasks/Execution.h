@@ -36,7 +36,7 @@ public:
 
     Execution();
 
-    explicit Execution(bool sync, const TimeSpan &timeout, const String &param = String::Empty);
+    explicit Execution(bool sync, const TimeSpan &timeout, const StringArray &params = StringArray::Empty);
 
     bool equals(const Execution &other) const override;
 
@@ -62,14 +62,18 @@ public:
 
     String toString() const;
 
-    const String &param() const;
+    const StringArray &params() const;
 
-    void setParam(const String &param);
+    void setParams(const StringArray &params);
+
+    const String &result() const;
 
 protected:
     bool _sync;
     TimeSpan _timeout;
-    String _param;
+
+    StringArray _params;
+    String _result;
 };
 
 class AppExecution : public Execution {
@@ -77,7 +81,7 @@ public:
     AppExecution() = default;
 
     explicit AppExecution(bool sync, const TimeSpan &timeout,
-                          const String &app, const String &param);
+                          const String &app, const StringArray &params);
 
     ~AppExecution() override = default;
 
@@ -145,7 +149,7 @@ public:
                              const String &script);
 
     explicit PythonExecution(bool sync, const TimeSpan &timeout,
-                             const String &fileName, const String &param);
+                             const String &fileName, const StringArray &params);
 
     ~PythonExecution() override = default;
 

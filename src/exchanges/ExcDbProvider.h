@@ -14,6 +14,7 @@
 #include "database/SqlConnection.h"
 #include "ExcDbContent.h"
 #include "ExcDbSqlStorage.h"
+#include "../tasks/Crontab.h"
 
 using namespace Database;
 
@@ -29,7 +30,7 @@ public:
     FetchResult getTableValues(const String &tableName, const StringArray &colNames,
                                const SqlSelectFilter &filter, DataTable &table) override;
 
-    FetchResult execButton(const String &buttonName, const StringMap &params, VariantMap &results) override;
+    FetchResult execButton(const String &buttonName, ExecType type, const StringMap &params, VariantMap &results) override;
 
 private:
     SqlConnection *connection() const;
@@ -44,6 +45,10 @@ private:
     static String getSchema();
 
     static String updateSql(const SqlSelectFilter &filter, const String &sql);
+
+    FetchResult execByArgument(Crontab &crontab, const String &buttonName, const StringMap &params, VariantMap &results);
+
+    FetchResult execByTempTable(Crontab &crontab, const String &buttonName, const StringMap &params, VariantMap &results);
 
 private:
     bool _logSqlInfo;

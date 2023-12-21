@@ -29,7 +29,7 @@ public:
     FetchResult getTableValues(const String &tableName, const StringArray &colNames,
                                const SqlSelectFilter &filter, DataTable &dataTable) override;
 
-    FetchResult execButton(const String &buttonName, const StringMap &params, VariantMap &results) override;
+    FetchResult execButton(const String &buttonName, ExecType type, const StringMap &params, VariantMap &results) override;
 
     // Labels
     bool getLabels(const SqlSelectFilter &filter, DataTable &table);

@@ -204,7 +204,7 @@ void Crontab::updateYmlProperties(YmlNode::Properties &properties, int pos) cons
             auto app = dynamic_cast<const AppExecution *>(_execution);
             assert(app);
             properties.add(String::format(ExecutionPrefix "app", pos), app->app());
-            properties.add(String::format(ExecutionPrefix "param", pos), app->param());
+            properties.add(String::format(ExecutionPrefix "param", pos), app->params().toString(' '));
         } else if (type == "sql") {
             auto sql = dynamic_cast<const SqlExecution *>(_execution);
             assert(sql);
@@ -220,7 +220,7 @@ void Crontab::updateYmlProperties(YmlNode::Properties &properties, int pos) cons
                 properties.add(String::format(ExecutionPrefix "script", pos), python->script());
             } else {
                 properties.add(String::format(ExecutionPrefix "file", pos), python->fileName());
-                properties.add(String::format(ExecutionPrefix "param", pos), python->param());
+                properties.add(String::format(ExecutionPrefix "param", pos), python->params().toString(' '));
             }
         }
     }
@@ -311,7 +311,9 @@ bool Crontab::parse(const YmlNode::Properties &properties, int pos, Crontab &cro
                 String app, param;
                 properties.at(String::format(ExecutionPrefix "app", pos), app);
                 properties.at(String::format(ExecutionPrefix "param", pos), param);
-                crontab._execution = new AppExecution(sync, timeout, app, param);
+                StringArray params;
+                Convert::splitStr(param, params, ' ', '"', '\"');
+                crontab._execution = new AppExecution(sync, timeout, app, params);
             } else if (type == "sql") {
                 String sql, fileName;
                 properties.at(String::format(ExecutionPrefix "sql", pos), sql);
@@ -324,9 +326,11 @@ bool Crontab::parse(const YmlNode::Properties &properties, int pos, Crontab &cro
                 properties.at(String::format(ExecutionPrefix "script", pos), script);
                 properties.at(String::format(ExecutionPrefix "file", pos), fileName);
                 properties.at(String::format(ExecutionPrefix "param", pos), param);
+                StringArray params;
+                Convert::splitStr(param, params, ' ', '"', '\"');
                 crontab._execution = !script.isNullOrEmpty() ?
                                      new PythonExecution(sync, timeout, script) :
-                                     new PythonExecution(sync, timeout, fileName, param);
+                                     new PythonExecution(sync, timeout, fileName, params);
             } else {
                 Trace::error(String::format("Can not find the execution type'%s'!", type.c_str()));
             }
@@ -485,7 +489,9 @@ bool Crontab::parseExecution(const String &str, Execution *&execution) {
             String app, param;
             executionNode.getAttribute("app", app);
             executionNode.getAttribute("param", param);
-            execution = new AppExecution(sync, timeout, app, param);
+            StringArray params;
+            Convert::splitStr(param, params, ' ', '"', '\"');
+            execution = new AppExecution(sync, timeout, app, params);
             return true;
         } else if (type == "sql") {
             String sql, fileName;
@@ -500,9 +506,11 @@ bool Crontab::parseExecution(const String &str, Execution *&execution) {
             executionNode.getAttribute("script", script);
             executionNode.getAttribute("file", fileName);
             executionNode.getAttribute("param", param);
+            StringArray params;
+            Convert::splitStr(param, params, ' ', '"', '\"');
             execution = !script.isNullOrEmpty() ?
                         new PythonExecution(sync, timeout, script) :
-                        new PythonExecution(sync, timeout, fileName, param);
+                        new PythonExecution(sync, timeout, fileName, params);
             return true;
         } else {
             // Can not find execution type.
@@ -524,9 +532,14 @@ String Crontab::getTableName(const String &prefix, const String &tableName) {
     return prefix.isNullOrEmpty() ? tableName : String::format("%s.%s", prefix.c_str(), tableName.c_str());
 }
 
-void Crontab::addParam(const String &param) {
+void Crontab::setParams(const StringArray &params) {
     if (_execution != nullptr) {
-        String newParam = String::format("%s %s", _execution->param().c_str(), param.c_str());
-        _execution->setParam(newParam);
+        StringArray newParams = _execution->params();
+        newParams.addRange(params);
+        _execution->setParams(newParams);
     }
+}
+
+const String &Crontab::result() const {
+    return _execution != nullptr ? _execution->result() : String::Empty;
 }

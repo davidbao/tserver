@@ -225,6 +225,10 @@ FetchResult ExcService::execButton(const JsonNode &request, JsonNode &response) 
             for (size_t i = 0; i < nodes.count(); ++i) {
                 const JsonNode &node = nodes[i];
                 String name = node.getAttribute("name");
+                // argument | argv is argument type, otherwise database.
+                String execTypeStr = node.getAttribute("execType");
+                ExecType execType = String::equals(execTypeStr, "argument", true) ||
+                        String::equals(execTypeStr, "argv", true) ? ExecTypeArgument : ExecTypeDatabase;
 
                 auto toParameters = [](const DataTable &table, StringMap &params) {
                     for (size_t i = 0; i < table.columnCount(); ++i) {
@@ -256,15 +260,48 @@ FetchResult ExcService::execButton(const JsonNode &request, JsonNode &response) 
                 VariantMap values;
                 FetchResult result = FetchResult::NodeNotFound;
                 if (node.hasAttribute("parameters")) {
+                    // {
+                    //    "button": [
+                    //        {
+                    //            "name": "button1",
+                    //            "time": "2023-10-20 15:24:33",
+                    //            "user": "web",
+                    //            "parameters": {
+                    //                "param1": 1,
+                    //                "param2":"test",
+                    //                "param3": "test2"
+                    //            }
+                    //        }
+                    //    ]
+                    //}
                     node["parameters"].getAttribute(params);
                     updateTimeAndUser(node, params);
-                    result = provider->execButton(name, params, values);
+                    result = provider->execButton(name, execType, params, values);
                 } else if (node.hasAttribute("table")) {
+                    // {
+                    //    "button": [
+                    //        {
+                    //            "name": "button1",
+                    //            "time": "2023-10-20 15:24:33",
+                    //            "user": "web",
+                    //            "table": {
+                    //                "columns": [
+                    //                    "col1", "col2", "col3", "col4"
+                    //                ],
+                    //                "rows": [
+                    //                    [1, "2", "3", "4"],
+                    //                    [2, "3", "4", "5"],
+                    //                    [3, "4", "5", "6"]
+                    //                ]
+                    //            }
+                    //        }
+                    //    ]
+                    //}
                     DataTable table("table");
                     DataTable::parse(node.at("table"), table);
                     toParameters(table, params);
                     updateTimeAndUser(node, params);
-                    result = provider->execButton(name, params, values);
+                    result = provider->execButton(name, execType, params, values);
                 }
                 JsonNode iNode("item");
                 iNode.add(JsonNode("name", name));

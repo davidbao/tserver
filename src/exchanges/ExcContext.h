@@ -42,6 +42,11 @@ enum FetchResult {
 #define MaxLabelCount 1000
 #define MaxTableCount 1000
 
+enum ExecType {
+    ExecTypeDatabase = 0,
+    ExecTypeArgument = 1
+};
+
 class IExcProvider {
 public:
     IExcProvider() = default;
@@ -54,7 +59,7 @@ public:
     virtual FetchResult getTableValues(const String &tableName, const StringArray &colNames,
                                        const SqlSelectFilter &filter, DataTable &table) = 0;
 
-    virtual FetchResult execButton(const String &buttonName, const StringMap &params, VariantMap &results) = 0;
+    virtual FetchResult execButton(const String &buttonName, ExecType type, const StringMap &params, VariantMap &results) = 0;
 };
 
 #endif //TSERVER_EXCCONTEXT_H

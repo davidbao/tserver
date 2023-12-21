@@ -25,8 +25,8 @@ using namespace Crypto;
 Execution::Execution() : _sync(true), _timeout(TimeSpan::Zero) {
 }
 
-Execution::Execution(bool sync, const TimeSpan &timeout, const String &param) : _sync(sync), _timeout(timeout),
-                                                                                _param(param) {
+Execution::Execution(bool sync, const TimeSpan &timeout, const StringArray &params) : _sync(sync), _timeout(timeout),
+                                                                                _params(params) {
 }
 
 bool Execution::equals(const Execution &other) const {
@@ -75,17 +75,21 @@ String Execution::toString() const {
     return toJsonNode().toString();
 }
 
-const String &Execution::param() const {
-    return _param;
+const StringArray &Execution::params() const {
+    return _params;
 }
 
-void Execution::setParam(const String &param) {
-    _param = param;
+void Execution::setParams(const StringArray &params) {
+    _params = params;
+}
+
+const String &Execution::result() const {
+    return _result;
 }
 
 AppExecution::AppExecution(bool sync, const TimeSpan &timeout,
-                           const String &app, const String &param) :
-        Execution(sync, timeout, param), _app(app) {
+                           const String &app, const StringArray &params) :
+        Execution(sync, timeout, params), _app(app) {
 }
 
 bool AppExecution::equals(const Execution &other) const {
@@ -94,7 +98,7 @@ bool AppExecution::equals(const Execution &other) const {
     }
     auto p = dynamic_cast<const AppExecution *>(&other);
     assert(p);
-    return _app == p->_app && _param == p->_param;
+    return _app == p->_app && _params == p->_params && _result == p->_result;
 }
 
 void AppExecution::evaluates(const Execution &other) {
@@ -102,7 +106,8 @@ void AppExecution::evaluates(const Execution &other) {
     auto p = dynamic_cast<const AppExecution *>(&other);
     assert(p);
     _app = p->_app;
-    _param = p->_param;
+    _params = p->_params;
+    _result = p->_result;
 }
 
 Execution *AppExecution::clone() const {
@@ -126,7 +131,8 @@ Execution::Result AppExecution::execute() {
             Process process;
             process.setRedirectStdout(true);
             process.setWaitingTimeout(_timeout);
-            bool result = Process::start(fileName, _param, &process);
+            bool result = Process::start(fileName, _params, &process);
+            _result = process.stdoutStr();
             Trace::info(process.stdoutStr());
             if (result) {
                 return !process.exist() ? Execution::Succeed : Execution::Timeout;
@@ -134,7 +140,7 @@ Execution::Result AppExecution::execute() {
                 return Execution::FailedToStartProcess;
             }
         } else {
-            bool result = Process::start(fileName, String::format("%s &", _param.c_str()));
+            bool result = Process::start(fileName, String::format("%s &", _params.toString(' ').c_str()));
             return result ? Execution::Succeed : Execution::FailedToStartProcess;
         }
     }
@@ -151,7 +157,8 @@ JsonNode AppExecution::toJsonNode() const {
     }
     node.add(syncNode);
     node.add(JsonNode("app", _app));
-    node.add(JsonNode("param", _param));
+    node.add(JsonNode("param", _params.toString(' ')));
+    node.add(JsonNode("result", _result));
     return node;
 }
 
@@ -280,8 +287,8 @@ PythonExecution::PythonExecution(bool sync, const TimeSpan &timeout, const Strin
         Execution(sync, timeout), _script(script) {
 }
 
-PythonExecution::PythonExecution(bool sync, const TimeSpan &timeout, const String &fileName, const String &param) :
-        Execution(sync, timeout, param), _fileName(fileName) {
+PythonExecution::PythonExecution(bool sync, const TimeSpan &timeout, const String &fileName, const StringArray &params) :
+        Execution(sync, timeout, params), _fileName(fileName) {
 }
 
 bool PythonExecution::equals(const Execution &other) const {
@@ -290,7 +297,7 @@ bool PythonExecution::equals(const Execution &other) const {
     }
     auto p = dynamic_cast<const PythonExecution *>(&other);
     assert(p);
-    return _script == p->_script && _fileName == p->_fileName && _param == p->_param;
+    return _script == p->_script && _fileName == p->_fileName && _params == p->_params && _result == p->_result;
 }
 
 void PythonExecution::evaluates(const Execution &other) {
@@ -299,7 +306,8 @@ void PythonExecution::evaluates(const Execution &other) {
     assert(p);
     _script = p->_script;
     _fileName = p->_fileName;
-    _param = p->_param;
+    _params = p->_params;
+    _result = p->_result;
 }
 
 Execution *PythonExecution::clone() const {
@@ -340,9 +348,11 @@ Execution::Result PythonExecution::execute() {
     }
 
     if (File::exists(fileName)) {
-        String param = !_param.isNullOrEmpty() ?
-                       String::format("%s %s", fileName.c_str(), _param.c_str()) :
-                       fileName;
+        StringArray params;
+        params.add(fileName);
+        if (_params.count() > 0) {
+            params.addRange(_params);
+        }
         static const char *PythonApp = "python";
 
         Execution::Result result;
@@ -350,8 +360,9 @@ Execution::Result PythonExecution::execute() {
             Process process;
             process.setRedirectStdout(true);
             process.setWaitingTimeout(_timeout);
-            bool r = Process::start(PythonApp, param, &process);
-            Trace::verb(String::format("Start a process'%d', param: '%s'.", process.id(), param.c_str()));
+            bool r = Process::start(PythonApp, params, &process);
+            _result = process.stdoutStr();
+            Trace::verb(String::format("Start a process'%d', param: '%s'.", process.id(), params.toString(' ').c_str()));
             Trace::info(process.stdoutStr());
             if (r) {
                 result = !process.exist() ? Execution::Succeed : Execution::Timeout;
@@ -360,8 +371,8 @@ Execution::Result PythonExecution::execute() {
             }
         } else {
             Process process;
-            bool r = Process::start(PythonApp, String::format("%s &", param.c_str()), &process);
-            Trace::verb(String::format("Start a process'%d', param: '%s'.", process.id(), param.c_str()));
+            bool r = Process::start(PythonApp, String::format("%s &", params.toString(' ').c_str()), &process);
+            Trace::verb(String::format("Start a process'%d', param: '%s'.", process.id(), params.toString(' ').c_str()));
             if (r) {
                 result = Execution::Succeed;
             } else {
@@ -392,7 +403,8 @@ JsonNode PythonExecution::toJsonNode() const {
     }
     if (!_fileName.isNullOrEmpty()) {
         node.add(JsonNode("file", _fileName));
-        node.add(JsonNode("param", _param));
+        node.add(JsonNode("param", _params));
+        node.add(JsonNode("result", _result));
     }
     return node;
 }

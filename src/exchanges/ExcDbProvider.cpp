@@ -8,8 +8,6 @@
 
 #include "ExcDbProvider.h"
 #include "IO/Path.h"
-#include "IO/File.h"
-#include "IO/FileStream.h"
 #include "database/SnowFlake.h"
 #include "system/Application.h"
 #include "microservice/DataSourceService.h"
@@ -168,110 +166,141 @@ FetchResult ExcDbProvider::getTableValues(const String &tableName, const StringA
     return FetchResult::ExecFailed;
 }
 
-FetchResult ExcDbProvider::execButton(const String &buttonName, const StringMap &params, VariantMap &results) {
-    SqlConnection *connection = this->connection();
-    if (connection == nullptr)
-        return FetchResult::DbError;
-
+FetchResult ExcDbProvider::execButton(const String &buttonName, ExecType type, const StringMap &params, VariantMap &results) {
     ServiceFactory *factory = ServiceFactory::instance();
     assert(factory);
     auto ts = factory->getService<TaskService>();
     assert(ts);
     auto storage = ts->storage();
     if (storage != nullptr) {
-        static const char *idStr = "id";
-        static const char *operationTimeStr = "operation_time";
-        static const char *operationUserStr = "operation_user";
-
         Crontab crontab;
         if (storage->getTask(buttonName, crontab) && crontab.hasResult()) {
-            auto saveParams = [](SqlConnection *connection, const String &buttonName,
-                                 const StringMap &params, uint64_t &id) {
-                StringMap other = params;
-                if (!other.contains(operationTimeStr)) {
-                    other.add(operationTimeStr, DateTime::now());
-                }
-                if (!other.contains(operationUserStr)) {
-                    other.add(operationUserStr, DbValue::NullValue);
-                }
-
-                String schema = getSchema();
-                String tableName = schema.isNullOrEmpty() ?
-                                   buttonName :
-                                   String::format("%s.%s", schema.c_str(), buttonName.c_str());
-                DataTable table(tableName);
-                table.addColumn(DataColumn(idStr, DbType::Integer64, true));
-                for (auto it = other.begin(); it != other.end(); ++it) {
-                    const String &key = it.key();
-                    table.addColumn(DataColumn(key, DbType::Text));
-                }
-
-                DataRow row;
-                id = SnowFlake::generateId();
-                row.addCell(DataCell(table.getColumn(idStr), id));
-                for (auto it = other.begin(); it != other.end(); ++it) {
-                    const String &key = it.key();
-                    const String &value = it.value();
-                    row.addCell(DataCell(table.getColumn(key), value));
-                }
-                table.addRow(row);
-                return connection->executeSqlInsert(table);
-            };
-            auto retrieveResult = [](SqlConnection *connection, const String &buttonName, const StringMap &params,
-                                     uint64_t id, VariantMap &results) {
-                DataTable table;
-                String schema = getSchema();
-                String tableName = schema.isNullOrEmpty() ?
-                                   buttonName :
-                                   String::format("%s.%s", schema.c_str(), buttonName.c_str());
-                String sql = String::format("SELECT * FROM %s WHERE ID=%" PRIu64, tableName.c_str(), id);
-                if (connection->executeSqlQuery(sql, table) && table.rowCount() == 1) {
-                    const DataCells &cells = table.rows()[0].cells();
-                    for (size_t i = 0; i < cells.count(); ++i) {
-                        const DataCell &cell = cells[i];
-                        if (!(String::equals(cell.columnName(), idStr, true) ||
-                              String::equals(cell.columnName(), operationTimeStr, true) ||
-                              String::equals(cell.columnName(), operationUserStr, true) ||
-                              params.contains(cell.columnName()))) {
-                            results.add(cell.columnName(), cell.value());
-                        }
-                    }
-                    return true;
-                }
-                return false;
-            };
-            auto cleanRecords = [](SqlConnection *connection, const String &buttonName) {
-                String schema = getSchema();
-                String tableName = schema.isNullOrEmpty() ?
-                                   buttonName :
-                                   String::format("%s.%s", schema.c_str(), buttonName.c_str());
-                DateTime time = DateTime::now().date().addDays(-7);
-                String sql = String::format("DELETE FROM %s WHERE OPERATION_TIME<='%s'",
-                                            tableName.c_str(), time.toString().c_str());
-                return connection->executeSql(sql);
-            };
-
-            // Clean 7 days ago.
-            cleanRecords(connection, buttonName);
-
-            // Save params to db.
-            uint64_t id;
-            if (!saveParams(connection, buttonName, params, id)) {
-                Trace::error(String::format("Can not save button'%s' record!", buttonName.c_str()));
+            if (type == ExecType::ExecTypeArgument) {
+                return execByArgument(crontab, buttonName, params, results);
+            } else {
+                return execByTempTable(crontab, buttonName, params, results);
             }
-
-            // Invoke an execution.
-            crontab.addParam(UInt64(id).toString());
-            crontab.execute();
-
-            // Retrieve the results.
-            if (!retrieveResult(connection, buttonName, params, id, results)) {
-                Trace::error(String::format("Can not retrieve button'%s' record!", buttonName.c_str()));
-            }
-            return FetchResult::Succeed;
         }
     }
     return FetchResult::ExecFailed;
+}
+
+FetchResult ExcDbProvider::execByArgument(Crontab &crontab, const String &buttonName, const StringMap &params, VariantMap &results) {
+    // Invoke an execution.
+    JsonNode request("params", params);
+    crontab.setParams(StringArray({request.toString()}));
+    if (crontab.execute()) {
+        const String &result = crontab.result();
+        JsonNode response;
+        JsonNode::parse(result, response);
+        StringArray names;
+        response.getAttributeNames(names);
+        for (size_t i = 0; i < names.count(); i++) {
+            const String &name = names[i];
+            String v;
+            if (response.getAttribute(name, v)) {
+                results.add(name, Variant(v));
+            }
+        }
+        return FetchResult::Succeed;
+    }
+    return FetchResult::ExecFailed;
+}
+
+FetchResult ExcDbProvider::execByTempTable(Crontab &crontab, const String &buttonName, const StringMap &params, VariantMap &results) {
+    SqlConnection *connection = this->connection();
+    if (connection == nullptr)
+        return FetchResult::DbError;
+
+    static const char *idStr = "id";
+    static const char *operationTimeStr = "operation_time";
+    static const char *operationUserStr = "operation_user";
+
+    auto saveParams = [](SqlConnection *connection, const String &buttonName,
+                         const StringMap &params, uint64_t &id) {
+        StringMap other = params;
+        if (!other.contains(operationTimeStr)) {
+            other.add(operationTimeStr, DateTime::now());
+        }
+        if (!other.contains(operationUserStr)) {
+            other.add(operationUserStr, DbValue::NullValue);
+        }
+
+        String schema = getSchema();
+        String tableName = schema.isNullOrEmpty() ?
+                           buttonName :
+                           String::format("%s.%s", schema.c_str(), buttonName.c_str());
+        DataTable table(tableName);
+        table.addColumn(DataColumn(idStr, DbType::Integer64, true));
+        for (auto it = other.begin(); it != other.end(); ++it) {
+            const String &key = it.key();
+            table.addColumn(DataColumn(key, DbType::Text));
+        }
+
+        DataRow row;
+        id = SnowFlake::generateId();
+        row.addCell(DataCell(table.getColumn(idStr), id));
+        for (auto it = other.begin(); it != other.end(); ++it) {
+            const String &key = it.key();
+            const String &value = it.value();
+            row.addCell(DataCell(table.getColumn(key), value));
+        }
+        table.addRow(row);
+        return connection->executeSqlInsert(table);
+    };
+    auto retrieveResult = [](SqlConnection *connection, const String &buttonName, const StringMap &params,
+                             uint64_t id, VariantMap &results) {
+        DataTable table;
+        String schema = getSchema();
+        String tableName = schema.isNullOrEmpty() ?
+                           buttonName :
+                           String::format("%s.%s", schema.c_str(), buttonName.c_str());
+        String sql = String::format("SELECT * FROM %s WHERE ID=%" PRIu64, tableName.c_str(), id);
+        if (connection->executeSqlQuery(sql, table) && table.rowCount() == 1) {
+            const DataCells &cells = table.rows()[0].cells();
+            for (size_t i = 0; i < cells.count(); ++i) {
+                const DataCell &cell = cells[i];
+                if (!(String::equals(cell.columnName(), idStr, true) ||
+                      String::equals(cell.columnName(), operationTimeStr, true) ||
+                      String::equals(cell.columnName(), operationUserStr, true) ||
+                      params.contains(cell.columnName()))) {
+                    results.add(cell.columnName(), cell.value());
+                }
+            }
+            return true;
+        }
+        return false;
+    };
+    auto cleanRecords = [](SqlConnection *connection, const String &buttonName) {
+        String schema = getSchema();
+        String tableName = schema.isNullOrEmpty() ?
+                           buttonName :
+                           String::format("%s.%s", schema.c_str(), buttonName.c_str());
+        DateTime time = DateTime::now().date().addDays(-7);
+        String sql = String::format("DELETE FROM %s WHERE OPERATION_TIME<='%s'",
+                                    tableName.c_str(), time.toString().c_str());
+        return connection->executeSql(sql);
+    };
+
+    // Clean 7 days ago.
+    cleanRecords(connection, buttonName);
+
+    // Save params to db.
+    uint64_t id;
+    if (!saveParams(connection, buttonName, params, id)) {
+        Trace::error(String::format("Can not save button'%s' record!", buttonName.c_str()));
+    }
+
+    // Invoke an execution.
+    crontab.setParams(StringArray({UInt64(id).toString()}));
+    crontab.execute();
+
+    // Retrieve the results.
+    if (!retrieveResult(connection, buttonName, params, id, results)) {
+        Trace::error(String::format("Can not retrieve button'%s' record!", buttonName.c_str()));
+    }
+
+    return FetchResult::Succeed;
 }
 
 String ExcDbProvider::getSql(const String &name, ExcSqlType type) {

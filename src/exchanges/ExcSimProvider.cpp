@@ -157,7 +157,7 @@ FetchResult ExcSimProvider::getTableValues(const String &tableName, const String
     return FetchResult::ConfigError;
 }
 
-FetchResult ExcSimProvider::execButton(const String &buttonName, const StringMap &params, VariantMap &results) {
+FetchResult ExcSimProvider::execButton(const String &buttonName, ExecType type, const StringMap &params, VariantMap &results) {
     if (_storage != nullptr) {
         Button button;
         if (_storage->getButton(buttonName, button)) {
